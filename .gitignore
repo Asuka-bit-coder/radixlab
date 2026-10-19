@@ -1,0 +1,23 @@
+# CMake
+**/build/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+
+# Compiled files
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Java
+target/
+*.class
