@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="RadixLab converts exact positional numerals between bases 2 and 36, including repeating decimals.">
+    <title>RadixLab — Exact radix conversion</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a class="skip-link" href="#converter">Skip to converter</a>
+
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="RadixLab home">
+            <span class="brand-mark" aria-hidden="true">R</span>
+            <span>RadixLab</span>
+        </a>
+        <span class="header-note">Exact numeral systems</span>
+    </header>
+
+    <main class="page">
+        <section class="intro" aria-labelledby="page-title">
+            <p class="eyebrow">Positional number laboratory</p>
+            <h1 id="page-title">See every digit.<br>Nothing rounded away.</h1>
+            <p class="lede">
+                Convert integers and fractions between bases 2 and 36 using
+                arbitrary-precision arithmetic. RadixLab reports terminating
+                results, complete repeating cycles, and honest truncation.
+            </p>
+        </section>
+
+        <section id="converter" class="converter" aria-labelledby="converter-title">
+            <div class="form-panel">
+                <div class="panel-heading">
+                    <h2 id="converter-title">Convert a numeral</h2>
+                    <button id="swap-bases" class="text-button" type="button">
+                        Swap bases
+                    </button>
+                </div>
+
+                <form id="convert-form" novalidate>
+                    <div class="field field-number">
+                        <label for="number">Numeral</label>
+                        <input
+                            id="number"
+                            name="number"
+                            type="text"
+                            value="101101.011"
+                            maxlength="4096"
+                            autocomplete="off"
+                            autocapitalize="off"
+                            spellcheck="false"
+                            aria-describedby="number-help"
+                        >
+                        <p id="number-help" class="field-help">
+                            Optional sign, one radix point. Letters are case-insensitive.
+                        </p>
+                    </div>
+
+                    <div class="base-row">
+                        <div class="field">
+                            <label for="from-base">From base</label>
+                            <select id="from-base" name="fromBase"></select>
+                        </div>
+
+                        <div class="field">
+                            <label for="to-base">To base</label>
+                            <select id="to-base" name="toBase"></select>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="fraction-limit">
+                            Fraction digit limit
+                            <span class="label-note">optional</span>
+                        </label>
+                        <input
+                            id="fraction-limit"
+                            name="maxFractionDigits"
+                            type="number"
+                            min="0"
+                            max="4096"
+                            step="1"
+                            value="256"
+                            inputmode="numeric"
+                            aria-describedby="limit-help"
+                        >
+                        <p id="limit-help" class="field-help">
+                            Cycles within this limit are shown exactly. Otherwise output is marked truncated.
+                        </p>
+                    </div>
+
+                    <div id="form-error" class="error-message" role="alert" hidden></div>
+
+                    <button id="convert-button" class="primary-button" type="submit">
+                        <span class="button-label">Convert</span>
+                        <span class="button-arrow" aria-hidden="true">→</span>
+                    </button>
+                </form>
+
+                <div class="examples" aria-labelledby="examples-title">
+                    <span id="examples-title" class="examples-label">Try an example</span>
+                    <div class="example-list">
+                        <button type="button" class="example" data-number="101101.011" data-from="2" data-to="16">Binary → Hex</button>
+                        <button type="button" class="example" data-number="0.1" data-from="10" data-to="2">Repeat in binary</button>
+                        <button type="button" class="example" data-number="2AF.8" data-from="16" data-to="10">Hex → Decimal</button>
+                        <button type="button" class="example" data-number="0.1" data-from="10" data-to="3">Repeat in ternary</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="result-panel" aria-live="polite" aria-atomic="true">
+                <div class="result-topline">
+                    <span class="result-kicker">Result</span>
+                    <button id="copy-result" class="text-button" type="button" hidden>Copy</button>
+                </div>
+
+                <div id="result-empty" class="result-empty">
+                    <div class="empty-mark" aria-hidden="true">0.1</div>
+                    <p>Enter a numeral and choose two bases.</p>
+                    <p class="empty-detail">The exact representation will appear here.</p>
+                </div>
+
+                <div id="result-content" class="result-content" hidden>
+                    <p id="result-expression" class="result-expression"></p>
+                    <output id="result-output" class="result-output" tabindex="-1"></output>
+                    <div id="result-status" class="result-status"></div>
+                    <p id="result-detail" class="result-detail"></p>
+                </div>
+
+                <div class="engine-note">
+                    <span class="engine-dot" aria-hidden="true"></span>
+                    C++20 exact arithmetic engine
+                </div>
+            </div>
+        </section>
+
+        <section class="notes" aria-label="How results are represented">
+            <article>
+                <h2>Terminating</h2>
+                <p>A finite fraction such as <code>0.5₁₀ = 0.1₂</code>. The denominator divides a power of the target base.</p>
+            </article>
+            <article>
+                <h2>Repeating</h2>
+                <p>A complete cycle is enclosed in parentheses: <code>0.0(0011)₂</code>. The reported value remains exact.</p>
+            </article>
+            <article>
+                <h2>Truncated</h2>
+                <p>If no cycle closes within the chosen limit, RadixLab returns the emitted digits and marks the result inexact.</p>
+            </article>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>RadixLab v0.1.0 · C++20 engine · Java 21 / Spring Boot</p>
+        <code>POST /api/v1/convert</code>
+    </footer>
+
+    <script src="app.js" defer></script>
+</body>
+</html>
