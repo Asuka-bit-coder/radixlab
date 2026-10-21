@@ -1,5 +1,7 @@
 # RadixLab
 
+[![CI](https://github.com/Asuka-bit-coder/radixlab/actions/workflows/ci.yml/badge.svg)](https://github.com/Asuka-bit-coder/radixlab/actions/workflows/ci.yml)
+
 **Exact numeral conversion between bases 2 and 36, from the command line to the browser.**
 
 RadixLab is an educational systems-software project built around one strict
