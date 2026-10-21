@@ -395,8 +395,28 @@ void runCanonical(const BooleanOptions& options) {
 
 void runEquivalent(const BooleanOptions& options) {
     rejectUnknown(options, {"left", "right"});
-    const auto left = parseExpression(required(options, "left"));
-    const auto right = parseExpression(required(options, "right"));
+
+    boolean::ExprPtr left;
+    boolean::ExprPtr right;
+
+    try {
+        left = parseExpression(required(options, "left"));
+    } catch (const boolean::ParseError& error) {
+        throw boolean::ParseError(
+            "Left expression: " + std::string(error.what()),
+            error.position()
+        );
+    }
+
+    try {
+        right = parseExpression(required(options, "right"));
+    } catch (const boolean::ParseError& error) {
+        throw boolean::ParseError(
+            "Right expression: " + std::string(error.what()),
+            error.position()
+        );
+    }
+
     const auto result = boolean::checkEquivalent(*left, *right);
 
     if (options.json) {
