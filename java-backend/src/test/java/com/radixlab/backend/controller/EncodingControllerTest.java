@@ -91,7 +91,7 @@ class EncodingControllerTest {
     }
 
     @Test
-    void mapsIllegalBcdTo400() throws Exception {
+    void mapsEncodingDomainErrorTo400() throws Exception {
         when(encodingService.encodeBcd(any(BcdEncodeRequest.class)))
                 .thenThrow(new InvalidEncodingException("Illegal BCD nibble"));
 
