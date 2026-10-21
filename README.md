@@ -356,7 +356,7 @@ mvn test
 RADIXLAB_CLI_PATH="$PWD/../cpp-core/build/radixlab-cli" mvn verify
 ```
 
-The current local suites contain 258 C++ assertions, 24 CLI process checks, and
+The current local suites contain 258 C++ assertions, 25 CLI process checks, and
 55 JUnit tests (39 unit/controller plus 16 integration). CI runs Debug and
 Release C++ builds, Java tests, and the full end-to-end suite on Ubuntu.
 

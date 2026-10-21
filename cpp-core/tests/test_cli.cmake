@@ -229,6 +229,13 @@ expect_stdout_contains(
     encoding --operation bcd-decode --bits 01011001 --json
 )
 
+string(REPEAT "0" 4100 oversized_bcd)
+expect_cli_error(
+    "BCD bit limit"
+    3 "4096-bit BCD limit"
+    encoding --operation bcd-decode --bits "${oversized_bcd}" --json
+)
+
 expect_stdout_contains(
     "Gray decoding"
     0 "\"value\":\"13\""

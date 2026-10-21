@@ -29,6 +29,7 @@ constexpr std::size_t kMaxBitString = 64;
 constexpr std::size_t kMaxDecimalValueLength = 64;
 constexpr std::size_t kMaxBcdDigits = 1024;
 constexpr std::size_t kMaxBcdBits = 4096;
+constexpr std::size_t kMaxBcdInputChars = kMaxBcdBits * 2U;
 
 struct LimitError : std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -348,8 +349,21 @@ void runBcdDecode(const EncodingOptions& options) {
     rejectUnknown(options, {"bits"});
 
     const std::string& bitString = required(options, "bits");
-    if (bitString.size() > kMaxBcdBits + kMaxBcdDigits) {
+    if (bitString.size() > kMaxBcdInputChars) {
         throw LimitError("--bits exceeds the BCD input limit");
+    }
+
+    std::size_t bitCount = 0;
+    for (const char character : bitString) {
+        if (character == ' ') {
+            continue;
+        }
+        ++bitCount;
+        if (bitCount > kMaxBcdBits) {
+            throw LimitError(
+                "--bits exceeds the 4096-bit BCD limit (1024 groups)"
+            );
+        }
     }
 
     const auto result = encoding::decodeBcd(bitString);

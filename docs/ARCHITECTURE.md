@@ -284,12 +284,12 @@ and parity generation with an optional single-bit flip. Results are rendered wit
 | BCD | 26 assertions: groups, leading zeros, illegal nibbles, comparison |
 | Gray code | 17 assertions: known sequence, adjacency, round trips, 64-bit boundary |
 | Parity | 23 assertions: even/odd, flips, undetected double flips, 64-bit |
-| CLI process | 24 checks: conversion/encoding output, JSON, exit codes, limits |
+| CLI process | 25 checks: conversion/encoding output, JSON, exit codes, limits |
 | Java unit | Service mapping, CLI adapters, process adapter, concurrency |
 | Java web | `@WebMvcTest` validation and error statuses for both API families |
 | Integration | HTTP → Spring → real CLI → C++ conversion and encoding, plus both UIs |
 
-Total: 258 C++ assertions, 24 CLI checks, and 55 JUnit tests.
+Total: 258 C++ assertions, 25 CLI checks, and 55 JUnit tests.
 
 Tests do not rely on `assert()` being enabled, so Debug and Release C++ builds
 run the same checks. CI rejects failures rather than ignoring them.
