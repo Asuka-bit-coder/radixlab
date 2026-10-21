@@ -268,6 +268,10 @@ function updateTruthToggles() {
             "aria-label",
             `Toggle variable ${variable}; current value ${selectedAssignment[variable] ? "1" : "0"}`
         );
+        button.setAttribute(
+            "aria-pressed",
+            selectedAssignment[variable] ? "true" : "false"
+        );
         button.addEventListener("click", () => {
             selectedAssignment[variable] = !selectedAssignment[variable];
             selectMatchingRow();
