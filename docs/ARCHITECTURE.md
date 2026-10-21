@@ -6,18 +6,19 @@ RadixLab has four concrete layers and one deliberate protocol boundary.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Browser: exact converter + interactive Encoding Lab          │
+│ Browser: converter + Encoding Lab + Boolean Lab              │
 └──────────────────────────────┬───────────────────────────────┘
                                │ JSON over HTTP
 ┌──────────────────────────────▼───────────────────────────────┐
 │ Spring Boot                                                  │
 │                                                              │
-│ ConversionController          EncodingController             │
-│   └─ ConversionService          └─ EncodingService           │
-│        └─ RadixEngine                 └─ EncodingEngine      │
-│             └─ CliRadixEngine              └─ CliEncodingEngine│
-│                        └──────────┬──────────────┘           │
-│                            CliEngineClient                   │
+│ ConversionController  EncodingController  BooleanController │
+│   └─ ConversionService  └─ EncodingService  └─ BooleanService │
+│        └─ RadixEngine         └─ EncodingEngine └─ BooleanEngine│
+│             └─ CliRadixEngine      └─ CliEncodingEngine       │
+│                       └─ CliBooleanEngine                     │
+│                                  └─┬──────────────────────────│
+│                            CliEngineClient                    │
 │                              ├─ shared Semaphore              │
 │                              ├─ shared timeout policy         │
 │                              └─ ProcessExecutor ◄── fake tests│
@@ -27,7 +28,8 @@ RadixLab has four concrete layers and one deliberate protocol boundary.
 ┌──────────────────────────────▼───────────────────────────────┐
 │ radixlab-cli                                                 │
 │   ├─ conversion: RationalParser → RadixConverter             │
-│   └─ encoding: BitVector, signed, BCD, Gray, parity          │
+│   ├─ encoding: BitVector, signed, BCD, Gray, parity          │
+│   └─ boolean: Lexer → Parser → AST → tables/equivalence       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -172,6 +174,67 @@ are both reported, and the receiver recomputes parity independently of the
 transmitted bit. The model intentionally documents that single-bit parity cannot
 detect all even numbers of errors and cannot locate or correct an error.
 
+## Boolean core
+
+The v0.3.0 engine is a small compiler-style pipeline.
+
+### Lexer and tokens
+
+`Lexer::tokenize` scans A–Z variables, `0`/`1`, `!`, `&`, `^`, `|`, parentheses,
+and whitespace. Each token stores its zero-based source position, and a final End
+token marks the input boundary. Lowercase identifiers and unknown characters
+raise `ParseError` with an exact position.
+
+### Recursive-descent parser
+
+The grammar gives precedence by function layering:
+
+```text
+expression := or
+or         := xor ( "|" xor )*
+xor        := and ( "^" and )*
+and        := unary ( "&" unary )*
+unary      := "!" unary | primary
+primary    := VARIABLE | "0" | "1" | "(" expression ")"
+```
+
+Binary operators are left-associative because each layer consumes repeated
+operands in a loop. Parentheses recurse into the expression layer. The parser
+enforces a 64-level nesting limit and an AST node limit.
+
+### AST ownership
+
+`Expr` is a polymorphic base with `VariableExpr`, `ConstantExpr`, `NotExpr`, and
+`BinaryExpr`. Child nodes are `std::unique_ptr<Expr>`, so the root uniquely owns
+the complete tree. Copying is disabled. Evaluation, variable collection, display,
+and JSON rendering are recursive virtual operations. This is simpler than a
+visitor hierarchy for a five-node grammar and avoids raw owning pointers.
+
+### Evaluation, truth tables, and limits
+
+Variables are `A`–`Z`; constants are `0`/`1`. Evaluation throws
+`EvaluationError` when a required variable is absent. Truth-table generation
+sorts the variable set, uses the first variable as the row-index MSB, enumerates
+`2^n` rows (one row for constants), and caps tables and equivalence at six
+variables. The CLI/API cap user expressions at 1024 characters; the parser has a
+larger 4096-character internal bound so generated canonical forms can be parsed
+back for verification.
+
+### Canonical forms
+
+Minterms are rows with result 1; maxterms are rows with result 0. SOP is the OR
+of expanded minterms; POS is the AND of expanded maxterms. Constant functions use
+the conventional empty sum/product notation where one side has no terms. The
+engine reparses both generated strings and checks every original row before
+returning them. These are canonical expansions, not minimized expressions.
+
+### Equivalence
+
+`checkEquivalent` builds the sorted union of both variable sets, enumerates all
+assignments, and returns the first row where results differ. The counterexample
+includes the assignment and both results. The algorithm never compares AST or
+expression strings.
+
 ## CLI contract
 
 ```bash
@@ -192,6 +255,15 @@ radixlab-cli encoding \
 The `encoding` namespace currently supports `signed-encode`, `signed-decode`,
 `bcd-encode`, `bcd-decode`, `gray-encode`, `gray-decode`, and `parity`. See
 `radixlab-cli encoding --help`.
+
+The `boolean` namespace supports:
+
+```bash
+radixlab-cli boolean evaluate --expression "A & B" --assignment "A=1,B=1" --json
+radixlab-cli boolean truth-table --expression "A & B" --json
+radixlab-cli boolean canonical-forms --expression "A ^ B" --json
+radixlab-cli boolean equivalent --left "!(A & B)" --right "!A | !B" --json
+```
 
 Success writes exactly one JSON object to stdout:
 
@@ -218,9 +290,9 @@ limit, and `4` value outside the representable encoding range.
 ### Request pipeline
 
 1. Jackson binds the JSON body.
-2. Jakarta Bean Validation enforces shape, length, base, and bit constraints.
+2. Jakarta Bean Validation enforces shape, length, base, bit, and expression constraints.
 3. `ConversionService` applies the default fraction limit (256).
-4. `CliRadixEngine` or `CliEncodingEngine` builds an argument vector.
+4. `CliRadixEngine`, `CliEncodingEngine`, or `CliBooleanEngine` builds an argument vector.
 5. `CliEngineClient` acquires a process slot and invokes `ProcessExecutor`.
 6. stdout and stderr are drained concurrently on virtual threads.
 7. A timeout terminates the child, first gracefully and then forcibly.
@@ -229,11 +301,12 @@ limit, and `4` value outside the representable encoding range.
 
 ### Replaceable boundaries
 
-`RadixEngine` is the service boundary. `ConversionServiceTest` and `EncodingServiceTest` substitute them without
-touching processes. `ProcessExecutor` is the OS boundary. `CliRadixEngineTest`
-and `CliEncodingEngineTest` substitute it to verify command construction, output
-parsing, timeout mapping, and range mapping. `ConversionIntegrationTest` and
-`EncodingIntegrationTest` use the real C++ binary through HTTP.
+`RadixEngine` is the service boundary. `ConversionServiceTest`, `EncodingServiceTest`, and `BooleanServiceTest`
+substitute them without touching processes. `ProcessExecutor` is the OS boundary.
+`CliRadixEngineTest`, `CliEncodingEngineTest`, and `CliBooleanEngineTest`
+substitute it to verify command construction, output parsing, timeout mapping,
+range mapping, and parse-position mapping. The conversion, encoding, and Boolean
+integration tests use the real C++ binary through HTTP.
 
 ### Failure mapping
 
@@ -242,6 +315,9 @@ parsing, timeout mapping, and range mapping. `ConversionIntegrationTest` and
 | Bean validation failure | `MethodArgumentNotValidException` | 400 |
 | Malformed JSON | `HttpMessageNotReadableException` | 400 |
 | CLI input rejection | `InvalidNumberException` / `InvalidEncodingException` | 400 |
+| Boolean syntax error | `BooleanParseException` with position/column | 400 |
+| Boolean variable/input limit | `BooleanLimitException` | 422 |
+| Invalid Boolean assignment | `InvalidBooleanRequestException` | 400 |
 | Representable-range rejection | `UnrepresentableValueException` | 422 |
 | Process timeout | `EngineTimeoutException` | 504 |
 | No process slot | `EngineBusyException` | 503 |
@@ -254,8 +330,8 @@ syntax.
 
 ## Front end
 
-Spring Boot serves `src/main/resources/static/index.html`, the v0.2.0
-`encoding.html` Encoding Lab, and their assets. Neither page uses a framework or
+Spring Boot serves `src/main/resources/static/index.html`, `encoding.html`, the
+v0.3.0 `boolean.html` Boolean Lab, and their assets. Neither page uses a framework or
 external network assets. The converter:
 
 - populates bases 2–36 locally;
@@ -271,6 +347,11 @@ signed encode/decode, BCD groups, Gray transitions with changed-bit highlighting
 and parity generation with an optional single-bit flip. Results are rendered with
 `textContent`, not injected HTML.
 
+The Boolean Lab adds a live expression workspace, recursive AST viewer,
+row-selectable truth table, canonical minterm/maxterm panels, and an equivalence
+checker. Parse errors display the engine's column and a caret marker. All user
+content is inserted with `textContent`; no expression becomes HTML.
+
 ## Testing strategy
 
 | Layer | Tests |
@@ -284,12 +365,17 @@ and parity generation with an optional single-bit flip. Results are rendered wit
 | BCD | 26 assertions: groups, leading zeros, illegal nibbles, comparison |
 | Gray code | 17 assertions: known sequence, adjacency, round trips, 64-bit boundary |
 | Parity | 23 assertions: even/odd, flips, undetected double flips, 64-bit |
-| CLI process | 25 checks: conversion/encoding output, JSON, exit codes, limits |
-| Java unit | Service mapping, CLI adapters, process adapter, concurrency |
-| Java web | `@WebMvcTest` validation and error statuses for both API families |
-| Integration | HTTP → Spring → real CLI → C++ conversion and encoding, plus both UIs |
+| Boolean lexer | 14 assertions: token classes, positions, whitespace, illegal input |
+| Boolean parser | 18 assertions: precedence, grouping, AST shape, errors, limits |
+| Boolean evaluator | 9 assertions: recursive evaluation, missing variables, constants |
+| Boolean tables/canonical | 18 assertions: row order, minterms/maxterms, SOP/POS |
+| Boolean equivalence | 28 assertions: standard laws, counterexamples, limits |
+| CLI process | 34 checks: conversion/encoding/Boolean output, JSON, exit codes, limits |
+| Java unit | Service mapping, CLI adapters, process adapter, concurrency, Boolean validation |
+| Java web | `@WebMvcTest` validation and error statuses for all three API families |
+| Integration | HTTP → Spring → real CLI → C++, plus all three UIs |
 
-Total: 258 C++ assertions, 25 CLI checks, and 55 JUnit tests.
+Total: 345 C++ assertions, 34 CLI checks, and 80 JUnit tests.
 
 Tests do not rely on `assert()` being enabled, so Debug and Release C++ builds
 run the same checks. CI rejects failures rather than ignoring them.

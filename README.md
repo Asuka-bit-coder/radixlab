@@ -2,25 +2,30 @@
 
 [![CI](https://github.com/Asuka-bit-coder/radixlab/actions/workflows/ci.yml/badge.svg)](https://github.com/Asuka-bit-coder/radixlab/actions/workflows/ci.yml)
 
-**Exact radix conversion and a hands-on Digital Logic Encoding Lab.**
+**Exact radix conversion, digital-logic encodings, and a Boolean Algebra Lab.**
 
-RadixLab is an educational systems-software project with two connected purposes:
+RadixLab is an educational systems-software project with three connected purposes:
 
 1. Convert positional numerals between bases 2 and 36 without floating-point
    approximation, including exact repeating-cycle and truncation reporting.
 2. Make machine-number and digital-logic encodings experimentally visible:
    sign-magnitude, ones' complement, two's complement, BCD, reflected Gray code,
    and parity.
+3. Make Boolean algebra observable: parse expressions into an AST, enumerate
+   truth tables, derive canonical SOP/POS, and verify logical equivalence with
+   concrete counterexamples.
 
-A C++20 engine provides arbitrary-precision arithmetic and bit-level encodings.
-A Java 21 / Spring Boot service exposes the engine over HTTP and serves two
-lightweight interfaces: the exact converter and the interactive Encoding Lab.
+A C++20 engine provides arbitrary-precision arithmetic, bit-level encodings, and
+a Boolean expression parser/evaluator. A Java 21 / Spring Boot service exposes the
+engine over HTTP and serves three interfaces: exact conversion, the Encoding Lab,
+and the Boolean Lab.
 
 ```text
 101101.011₂  →  2D.6₁₆          exact, terminating
 0.1₁₀        →  0.0(0011)₂      exact, repeating cycle
 -13₁₀        →  11110011₂       two's complement, 8 bits
 59₁₀         →  0101 1001      8421 BCD
+A XOR B      →  (!A & B) | (A & !B)   canonical SOP
 ```
 
 ## Features
@@ -50,6 +55,22 @@ lightweight interfaces: the exact converter and the interactive Encoding Lab.
 - Interactive Encoding Lab with four keyboard-accessible explorers.
 - Chinese course notes covering theory, algorithms, implementation, experiments,
   pitfalls, exercises, and verification.
+### Boolean Algebra Lab (v0.3.0)
+
+- Formal lexer and recursive-descent parser for `!`, `&`, `^`, `|`, parentheses,
+  constants, and variables A–Z.
+- Owned recursive AST using `std::unique_ptr`.
+- Exact error positions with HTTP 400 `parse_error` metadata.
+- Truth-table generation for up to 6 variables, with fixed A–Z order and
+  deterministic row numbering.
+- Canonical SOP/POS with minterm and maxterm indices, re-parsed and verified
+  against the original truth table.
+- Logical equivalence over the union of variables, returning a concrete
+  counterexample when two expressions differ.
+- Interactive Boolean Lab with expression editor, AST Explorer, row selection,
+  canonical forms, and an equivalence checker.
+- Chinese course notes and 16 original exercises.
+
 
 ## Exactness and encoding contracts
 
@@ -77,26 +98,28 @@ indistinguishable ordinary zero.
 ## Architecture
 
 ```text
-Browser: converter + Encoding Lab
+Browser: converter + Encoding Lab + Boolean Lab
   │
   │  POST /api/v1/convert
   │  POST /api/v1/encoding/{signed|bcd|gray|parity}
+  │  POST /api/v1/boolean/{evaluate|truth-table|canonical|equivalent}
   ▼
 Spring Boot (Java 21)
   ├─ Controllers + Jakarta Bean Validation
-  ├─ ConversionService / EncodingService
-  ├─ RadixEngine          EncodingEngine
-  │       └──────┬──────────────┘
-  │              ▼
-  │        CliEngineClient
-  │          ├─ shared Semaphore
-  │          ├─ shared timeout policy
-  │          └─ ProcessExecutor
-  │               └─ ProcessBuilder, argument vector, no shell
+  ├─ ConversionService / EncodingService / BooleanService
+  ├─ RadixEngine / EncodingEngine / BooleanEngine
+  │       └──────────────┬──────────────┘
+  │                      ▼
+  │                CliEngineClient
+  │                  ├─ shared Semaphore
+  │                  ├─ shared timeout policy
+  │                  └─ ProcessExecutor
+  │                       └─ ProcessBuilder, argument vector, no shell
   ▼
 radixlab-cli (C++20)
   ├─ conversion: RationalParser → RadixConverter
-  └─ encoding: BitVector, SignedEncoding, BCD, Gray, Parity
+  ├─ encoding: BitVector, SignedEncoding, BCD, Gray, Parity
+  └─ boolean: Lexer → Parser → AST → TruthTable / Canonical / Equivalence
 ```
 
 The CLI is the process protocol between Java and C++. Every request is passed as
@@ -194,6 +217,27 @@ enabled.
 Run `./cpp-core/build/radixlab-cli encoding --help` for all operations and
 options.
 
+### Boolean CLI
+
+```bash
+./cpp-core/build/radixlab-cli boolean evaluate \
+  --expression "A & (!B | C)" \
+  --assignment "A=1,B=0,C=0" --json
+
+./cpp-core/build/radixlab-cli boolean truth-table \
+  --expression "A & B" --json
+
+./cpp-core/build/radixlab-cli boolean canonical-forms \
+  --expression "A ^ B" --json
+
+./cpp-core/build/radixlab-cli boolean equivalent \
+  --left "!(A & B)" --right "!A | !B" --json
+```
+
+Boolean requests accept at most 1024 characters. Truth tables, canonical forms,
+and equivalence checks accept at most 6 distinct variables. The CLI reports
+syntax errors with a zero-based `position` and one-based `column`.
+
 ## Run the Java backend and web UI
 
 Build the CLI first, then start Spring Boot:
@@ -204,15 +248,16 @@ RADIXLAB_ENGINE_CLI_PATH=../cpp-core/build/radixlab-cli \
   mvn spring-boot:run
 ```
 
-Open <http://localhost:8080> for exact conversion and
-<http://localhost:8080/encoding.html> for the Encoding Lab. To run the packaged
+Open <http://localhost:8080> for exact conversion,
+<http://localhost:8080/encoding.html> for the Encoding Lab, and
+<http://localhost:8080/boolean.html> for the Boolean Lab. To run the packaged
 jar instead:
 
 ```bash
 cd java-backend
 mvn package
 RADIXLAB_ENGINE_CLI_PATH=../cpp-core/build/radixlab-cli \
-  java -jar target/radixlab-backend-0.2.0.jar
+  java -jar target/radixlab-backend-0.3.0.jar
 ```
 
 Configuration:
@@ -225,7 +270,8 @@ Configuration:
 
 ## API
 
-The API has one conversion endpoint and seven encoding endpoints:
+The API has one conversion endpoint, seven encoding endpoints, and four Boolean
+endpoints:
 
 ```text
 POST /api/v1/convert
@@ -236,6 +282,10 @@ POST /api/v1/encoding/bcd/decode      decode BCD → decimal
 POST /api/v1/encoding/gray            encode value → Gray code
 POST /api/v1/encoding/gray/decode     decode Gray code → value
 POST /api/v1/encoding/parity          generate/verify and optionally flip one bit
+POST /api/v1/boolean/evaluate         evaluate an expression under an assignment
+POST /api/v1/boolean/truth-table      enumerate variables and results
+POST /api/v1/boolean/canonical        canonical minterms/maxterms and SOP/POS
+POST /api/v1/boolean/equivalent       compare two expressions and return a counterexample
 ```
 
 ### Conversion
@@ -302,6 +352,32 @@ Gray responses include both binary and Gray patterns. Parity responses include
 the original/received bits, generated/recomputed parity bits, validity, and the
 optional flipped index.
 
+### Boolean lab
+
+```bash
+curl -sS http://localhost:8080/api/v1/boolean/evaluate \
+  -H 'Content-Type: application/json' \
+  -d '{"expression":"A & (!B | C)","assignment":{"A":true,"B":false,"C":false}}'
+
+curl -sS http://localhost:8080/api/v1/boolean/truth-table \
+  -H 'Content-Type: application/json' \
+  -d '{"expression":"A & B"}'
+
+curl -sS http://localhost:8080/api/v1/boolean/canonical \
+  -H 'Content-Type: application/json' \
+  -d '{"expression":"A ^ B"}'
+
+curl -sS http://localhost:8080/api/v1/boolean/equivalent \
+  -H 'Content-Type: application/json' \
+  -d '{"leftExpression":"A & B","rightExpression":"A | B"}'
+```
+
+Responses include the normalized expression and a structured `ast`. Truth
+tables use A–Z variable order with the first variable as the row-index MSB.
+Canonical responses include minterm/maxterm indices and both canonical forms.
+Equivalence responses include a counterexample assignment when the expressions
+differ.
+
 Errors use a stable shape:
 
 ```json
@@ -314,9 +390,12 @@ Errors use a stable shape:
 }
 ```
 
+Boolean parse errors also include `code`, zero-based `position`, and one-based
+`column` fields, allowing the UI to point at the failing character.
+
 HTTP statuses include `400` for invalid requests, `422` for unrepresentable
-values, `502` for engine failure, `503` when all process slots are busy, and
-`504` for a timeout. Full semantics are in [docs/API.md](docs/API.md).
+values or Boolean limits, `502` for engine failure, `503` when all process slots
+are busy, and `504` for a timeout. Full semantics are in [docs/API.md](docs/API.md).
 
 ## Course materials
 
@@ -328,6 +407,13 @@ The digital-logic course companion is in [docs/course/](docs/course/):
 - [8421 BCD](docs/course/03-bcd.md)
 - [Reflected Gray code](docs/course/04-gray-code.md)
 - [Parity](docs/course/05-parity.md)
+- [Boolean algebra](docs/course/06-boolean-algebra.md)
+- [Boolean expressions, Lexer, and AST](docs/course/07-boolean-expressions.md)
+- [Truth tables](docs/course/08-truth-tables.md)
+- [Minterms and maxterms](docs/course/09-minterms-maxterms.md)
+- [Canonical SOP and POS](docs/course/10-sop-pos.md)
+- [Logical equivalence](docs/course/11-equivalence.md)
+- [Boolean exercises](docs/course/12-boolean-exercises.md)
 - [Exercises and verification](docs/course/exercises.md)
 
 Each topic follows **Theory → Algorithm → Implementation → Experiment →
@@ -336,7 +422,7 @@ Verification**, with boundary cases, pitfalls, API/CLI examples, and exercises.
 ## Test everything
 
 ```bash
-# C++ unit, encoding, and CLI process tests
+# C++ unit, encoding, Boolean, and CLI process tests
 ctest --test-dir cpp-core/build --output-on-failure
 
 # Java unit and controller tests
@@ -347,8 +433,8 @@ mvn test
 RADIXLAB_CLI_PATH="$PWD/../cpp-core/build/radixlab-cli" mvn verify
 ```
 
-The current local suites contain 258 C++ assertions, 25 CLI process checks, and
-55 JUnit tests (39 unit/controller plus 16 integration). CI runs Debug and
+The current local suites contain 345 C++ assertions, 34 CLI process checks, and
+80 JUnit tests (58 unit/controller plus 22 integration). CI runs Debug and
 Release C++ builds, Java tests, and the full end-to-end suite on Ubuntu.
 
 ## Project layout
@@ -356,12 +442,14 @@ Release C++ builds, Java tests, and the full end-to-end suite on Ubuntu.
 ```text
 cpp-core/
   include/radixlab/encoding/   BitVector and encoding headers
+  include/radixlab/boolean/    Lexer, AST, parser, tables, equivalence
   src/encoding/                Signed, BCD, Gray, parity implementations
-  cli/                         Conversion + encoding CLI
+  src/boolean/                 Boolean engine implementation
+  cli/                         Conversion, encoding, and Boolean CLI
   tests/                       C++ and CLI process tests
 java-backend/
   src/main/java/               Controllers, services, DTOs, engine adapters
-  src/main/resources/static/   Converter and Encoding Lab UI
+  src/main/resources/static/   Converter, Encoding Lab, and Boolean Lab UI
   src/test/java/               Unit, controller, process, integration tests
 docs/
   course/                      Chinese digital-logic course companion
@@ -385,17 +473,21 @@ maintainer.
 - Radix conversion input and fractional output are capped at 4096
   characters/digits. Encoding widths are 1–64 bits; BCD accepts up to 1024
   decimal digits.
-- Only ASCII digit characters and the documented encoding names are supported.
+- Inputs are ASCII: numeral digits, encoding names, and Boolean variables/operators.
   Unicode digit forms and prefix syntax such as `0x` are rejected.
 - BCD in this release is explicitly unsigned. No signed BCD, packed-decimal
   arithmetic, Hamming code, or error correction is implemented.
 - Parity can detect an odd number of bit errors but can miss an even number and
   cannot locate or correct errors.
+- Boolean requests are capped at 1024 characters. Truth tables and equivalence
+  checks are capped at 6 variables; the parser internally caps AST size and
+  nesting. Canonical forms are expanded, not minimized.
 - The tested process-control paths target macOS and Linux.
 
 ## Roadmap
 
-- Boolean algebra, truth tables, Karnaugh maps, and combinational logic.
+- Karnaugh maps, Quine–McCluskey minimization, and minimized SOP/POS.
+- Combinational logic blocks: adders, comparators, MUX, and decoders.
 - Hamming code and error-correction experiments.
 - Signed BCD and decimal arithmetic protocols.
 - An in-process C++ integration (FFI/JNI) while retaining the CLI backend.

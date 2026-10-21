@@ -1,6 +1,6 @@
 # RadixLab 数字逻辑编码实验：总览
 
-> 本讲义是 RadixLab v0.2.0 的配套学习资料，依据项目实际实现编写。
+> 本讲义是 RadixLab v0.3.0 的配套学习资料，依据项目实际实现编写。
 > 它不是对某一本教材的复制，也不虚构教材页码或未经核实的课程要求。
 
 ## 1. 为什么做这个实验
@@ -81,6 +81,12 @@ RADIXLAB_ENGINE_CLI_PATH=../cpp-core/build/radixlab-cli \
 | BCD | 8421 权、合法四位组、前导零 | `encoding/bcd.*` | `/api/v1/encoding/bcd[/decode]` | BCD |
 | Gray Code | 反射构造、单比特相邻变化 | `encoding/gray_code.*` | `/api/v1/encoding/gray[/decode]` | Gray |
 | Parity | 偶/奇校验、错误检测上限 | `encoding/parity.*` | `/api/v1/encoding/parity` | Parity |
+| Boolean algebra | 运算、优先级、布尔定律 | `boolean/ast.*`、`parser.*` | `/api/v1/boolean/evaluate` | Boolean |
+| Boolean expressions | Lexer、递归下降、AST | `boolean/lexer.*`、`parser.*` | `/api/v1/boolean/evaluate` | Boolean |
+| Truth tables | 变量顺序、行枚举 | `boolean/truth_table.*` | `/api/v1/boolean/truth-table` | Boolean |
+| Minterms/Maxterms | 规范项编号 | `boolean/canonical_forms.*` | `/api/v1/boolean/canonical` | Boolean |
+| SOP/POS | 规范表达式、常量边界 | `boolean/canonical_forms.*` | `/api/v1/boolean/canonical` | Boolean |
+| Equivalence | 变量并集、反例 | `boolean/equivalence.*` | `/api/v1/boolean/equivalent` | Boolean |
 
 ## 5. 一次完整实验示例
 
@@ -157,6 +163,13 @@ ctest --test-dir cpp-core/build -R SignedEncodingTests --output-on-failure
 - [8421 BCD](03-bcd.md)
 - [反射 Gray Code](04-gray-code.md)
 - [奇偶校验](05-parity.md)
+- [Boolean Algebra](06-boolean-algebra.md)
+- [Boolean Expressions, Lexer 与 AST](07-boolean-expressions.md)
+- [Truth Tables](08-truth-tables.md)
+- [Minterms and Maxterms](09-minterms-maxterms.md)
+- [Canonical SOP and POS](10-sop-pos.md)
+- [Logical Equivalence](11-equivalence.md)
+- [Boolean 综合练习](12-boolean-exercises.md)
 - [综合练习与验证答案](exercises.md)
 
 ## 8. 实验边界
@@ -166,5 +179,7 @@ ctest --test-dir cpp-core/build -R SignedEncodingTests --output-on-failure
 - Parity 只实现单比特偶/奇校验，不实现 Hamming Code、纠错或错误定位。
 - 所有编码都在 C++ 整数域中完成，不使用浮点数。
 - API 输入长度、BCD 位数、并发与超时都有限制；这些限制是服务策略，不是数学结论。
+- Boolean 表达式请求不超过 1024 字符；真值表与等价检查最多 6 个不同变量。
+- Boolean AST 最多 4096 个节点，嵌套最多 64 层；这些限制用于保护服务端资源。
 
 下一章从“位模式为什么不同于数值”开始，建立后续所有编码的共同语言。

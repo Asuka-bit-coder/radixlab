@@ -69,6 +69,7 @@ Run a subset:
 ```bash
 ctest --test-dir cpp-core/build -R RadixConverterTests --output-on-failure
 ctest --test-dir cpp-core/build -R 'BitVectorTests|SignedEncodingTests|BcdTests' --output-on-failure
+ctest --test-dir cpp-core/build -R 'Boolean' --output-on-failure
 ctest --test-dir cpp-core/build -R CliTests --output-on-failure
 ```
 
@@ -82,16 +83,18 @@ the built executable and checks stdout, stderr, exit codes, JSON, and limits.
 3. Keep conversion and encoding in integer arithmetic; do not introduce floating point.
 4. Keep `BitVector` as a pattern, not an implicit signed value.
 5. Preserve representable-range checks; never mask an out-of-range input.
-6. Extend the executable tests for each success and failure state.
-7. Add a CLI process case if the public process contract changes.
-8. Build with `-Wall -Wextra -Wpedantic -Wconversion` and remove new warnings.
+6. Keep Boolean parsing grammar-driven; do not introduce string substitution or implicit operators.
+7. Keep AST ownership unique; child expressions are `std::unique_ptr`.
+8. Extend the executable tests for each success and failure state.
+9. Add a CLI process case if the public process contract changes.
+10. Build with `-Wall -Wextra -Wpedantic -Wconversion` and remove new warnings.
 
 ## Java workflow
 
 ```bash
 cd java-backend
 mvn test        # unit, controller, adapter, process tests
-mvn package     # builds target/radixlab-backend-0.2.0.jar
+mvn package     # builds target/radixlab-backend-0.3.0.jar
 ```
 
 `mvn test` excludes tests tagged `integration`. Full verification requires the
@@ -114,7 +117,7 @@ mvn -Dtest=CliRadixEngineTest test
 
 ### Manual backend smoke test
 
-Conversion and encoding share the same CLI path and process timeout.
+Conversion, encoding, and Boolean analysis share the same CLI path and process timeout.
 
 Terminal 1:
 
@@ -138,8 +141,9 @@ Expected:
 {"result":"0.0(0011)","exact":true,"truncated":false,"repeating":true}
 ```
 
-Open <http://localhost:8080> for the converter and
-<http://localhost:8080/encoding.html> for the Encoding Lab.
+Open <http://localhost:8080> for the converter,
+<http://localhost:8080/encoding.html> for the Encoding Lab, and
+<http://localhost:8080/boolean.html> for the Boolean Lab.
 
 Encoding smoke test:
 
@@ -147,6 +151,14 @@ Encoding smoke test:
 curl -sS http://localhost:8080/api/v1/encoding/signed \
   -H 'Content-Type: application/json' \
   -d '{"value":"-13","width":8,"encoding":"TWOS_COMPLEMENT"}'
+```
+
+Boolean smoke test:
+
+```bash
+curl -sS http://localhost:8080/api/v1/boolean/canonical \
+  -H 'Content-Type: application/json' \
+  -d '{"expression":"A ^ B"}'
 ```
 
 Expected:
@@ -204,6 +216,12 @@ tree directly if no Boost CMake package is installed.
 
 Build `cpp-core` first or set `RADIXLAB_CLI_PATH` to an absolute path.
 
+### Boolean parse error with `position`/`column`
+
+Check that the expression uses uppercase variables, supported operators, and
+balanced parentheses. The `column` field is one-based. More than six variables
+or an expression over 1024 characters returns HTTP 422.
+
 ### `Value ... outside the representable range` with HTTP 422
 
 The request is valid but cannot be encoded at that width. Choose a larger width or
@@ -231,7 +249,7 @@ For the jar, append `--server.port=8081`.
 
 1. C++ Debug and Release tests pass.
 2. `mvn verify` passes with the real CLI.
-3. Encoding endpoints and both UI pages pass the integration suite.
+3. Encoding and Boolean endpoints and all three UI pages pass the integration suite.
 4. CI jobs pass on the pushed commit.
 5. README, API, course notes, and observed outputs agree.
 6. No secrets or build artifacts are staged.
