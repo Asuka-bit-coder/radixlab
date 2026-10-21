@@ -2,7 +2,8 @@
 
 Base URL in local development: `http://localhost:8080`
 
-There is one public conversion endpoint. Static UI assets are served from `/`.
+The API has one radix-conversion endpoint and seven encoding endpoints.
+Static UI assets are served from `/` and `/encoding.html`.
 
 ## Convert a numeral
 
@@ -111,6 +112,221 @@ curl -sS http://localhost:8080/api/v1/convert \
 }
 ```
 
+
+## Encoding API
+
+All encoding endpoints consume and produce `application/json`, share the process
+timeout/concurrency controls described below, and reject values outside the
+representable range with `422 Unprocessable Entity`.
+
+### Signed encoding
+
+```http
+POST /api/v1/encoding/signed
+```
+
+Request:
+
+```json
+{
+  "value": "-13",
+  "width": 8,
+  "encoding": "TWOS_COMPLEMENT",
+  "negativeZero": false
+}
+```
+
+| Field | Type | Required | Constraints |
+| --- | --- | --- | --- |
+| `value` | string | yes | decimal integer, at most 64 characters |
+| `width` | integer | yes | 1–64 |
+| `encoding` | string | yes | `SIGN_MAGNITUDE`, `ONES_COMPLEMENT`, or `TWOS_COMPLEMENT` (case-insensitive; `-` or `_` separators accepted) |
+| `negativeZero` | boolean | no | request the distinct negative-zero pattern for value 0; sign-magnitude/ones' complement only |
+
+Response:
+
+```json
+{
+  "value": "-13",
+  "width": 8,
+  "encoding": "TWOS_COMPLEMENT",
+  "bits": "11110011",
+  "hex": "F3",
+  "representable": true,
+  "negativeZero": false,
+  "minimum": "-128",
+  "maximum": "127"
+}
+```
+
+The three encodings have different ranges:
+
+| Encoding | 8-bit range | Negative zero |
+| --- | --- | --- |
+| `SIGN_MAGNITUDE` | −127 … 127 | `10000000` |
+| `ONES_COMPLEMENT` | −127 … 127 | `11111111` |
+| `TWOS_COMPLEMENT` | −128 … 127 | none; zero is unique |
+
+An unrepresentable request returns `422`:
+
+```json
+{
+  "timestamp": "2026-10-21T10:00:00Z",
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "message": "Value -128 is outside the representable range [-127, 127]",
+  "path": "/api/v1/encoding/signed"
+}
+```
+
+### Signed decoding
+
+```http
+POST /api/v1/encoding/signed/decode
+```
+
+Request:
+
+```json
+{"bits":"10000000","encoding":"SIGN_MAGNITUDE"}
+```
+
+Response:
+
+```json
+{
+  "value": "0",
+  "width": 8,
+  "encoding": "SIGN_MAGNITUDE",
+  "bits": "10000000",
+  "hex": "80",
+  "representable": true,
+  "negativeZero": true,
+  "minimum": "-127",
+  "maximum": "127"
+}
+```
+
+The `negativeZero` flag preserves information that a plain integer zero would
+lose. Two's complement never reports it.
+
+### BCD encoding and decoding
+
+```http
+POST /api/v1/encoding/bcd
+POST /api/v1/encoding/bcd/decode
+```
+
+Encode request:
+
+```json
+{"decimal":"59"}
+```
+
+Decode request:
+
+```json
+{"bits":"01011001"}
+```
+
+Response:
+
+```json
+{
+  "decimal": "59",
+  "digits": "59",
+  "bits": "01011001",
+  "groups": ["0101", "1001"],
+  "value": "59",
+  "binary": "111011"
+}
+```
+
+- `decimal` accepts 1–1024 digits `0-9`; leading zeros are preserved.
+- BCD decode accepts 1–1024 complete 4-bit groups.
+- Every nibble must be `0000`–`1001`; illegal groups such as `1010` return `400`.
+- `binary` shows the ordinary positional binary representation for contrast.
+- Negative BCD is intentionally not defined in this protocol.
+
+### Gray code encoding and decoding
+
+```http
+POST /api/v1/encoding/gray
+POST /api/v1/encoding/gray/decode
+```
+
+Encode request:
+
+```json
+{"value":"13","width":8}
+```
+
+Decode request:
+
+```json
+{"bits":"00001011"}
+```
+
+Response:
+
+```json
+{
+  "value": "13",
+  "width": 8,
+  "binary": "00001101",
+  "gray": "00001011",
+  "binaryHex": "0D",
+  "grayHex": "0B"
+}
+```
+
+Gray values are unsigned and must lie in `0 … 2^width−1`. Adjacent encoded
+values differ in exactly one bit. Decoding returns both the binary pattern and
+the mathematical value.
+
+### Parity
+
+```http
+POST /api/v1/encoding/parity
+```
+
+Request:
+
+```json
+{"bits":"1011001","parity":"EVEN","flipBit":3}
+```
+
+| Field | Type | Required | Constraints |
+| --- | --- | --- | --- |
+| `bits` | string | yes | 1–64 binary digits |
+| `parity` | string | yes | `EVEN` or `ODD` (case-insensitive) |
+| `flipBit` | integer | no | data bit index 0–63, less than the data width |
+
+Response:
+
+```json
+{
+  "bits": "1010001",
+  "originalBits": "1011001",
+  "width": 7,
+  "parity": "EVEN",
+  "onesCount": 4,
+  "receivedOnesCount": 3,
+  "parityBit": "0",
+  "computedParityBit": "1",
+  "dataWithParity": "10110010",
+  "receivedWithParity": "10100010",
+  "valid": false,
+  "flipped": true,
+  "flippedIndex": 3
+}
+```
+
+`parityBit` is the transmitted bit generated from the original data.
+`computedParityBit` is recomputed from the received data. `valid` compares them.
+Parity can detect an odd number of flipped bits; it can miss an even number and
+cannot locate or correct errors.
+
 ## Errors
 
 Error responses use a consistent object:
@@ -127,9 +343,11 @@ Error responses use a consistent object:
 
 | Status | Condition |
 | --- | --- |
-| `400 Bad Request` | malformed JSON, missing/invalid field, invalid digit for base |
+| `400 Bad Request` | malformed JSON, missing/invalid field, invalid digit/BCD group, invalid encoding |
+| `415 Unsupported Media Type` | request is not JSON |
 | `404 Not Found` | unknown path |
 | `405 Method Not Allowed` | wrong HTTP method |
+| `422 Unprocessable Entity` | signed/Gray value outside the representable range |
 | `500 Internal Server Error` | unexpected server error |
 | `502 Bad Gateway` | CLI cannot start, exits abnormally, or returns unreadable output |
 | `503 Service Unavailable` | all configured process slots are busy |
@@ -149,7 +367,8 @@ the process is destroyed, then forcibly terminated if needed. The request
 receives `504`.
 
 The JVM reads stdout and stderr concurrently, preventing output-pipe deadlocks.
-Output is bounded by the CLI's 4096-character input and fractional limits.
+Output is bounded by the CLI's input limits: 4096 characters for conversion,
+64 bits for signed/Gray/parity, and 4096 BCD bits.
 
 ## Example session
 

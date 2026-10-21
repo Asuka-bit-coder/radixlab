@@ -6,31 +6,34 @@ RadixLab has four concrete layers and one deliberate protocol boundary.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Browser: semantic form, validation, result states            │
+│ Browser: exact converter + interactive Encoding Lab          │
 └──────────────────────────────┬───────────────────────────────┘
                                │ JSON over HTTP
 ┌──────────────────────────────▼───────────────────────────────┐
 │ Spring Boot                                                  │
 │                                                              │
-│ ConversionController                                         │
-│   └─ ConvertRequest / ConvertResponse                        │
-│ ConversionService                                            │
-│   └─ RadixEngine  ◄──────────── Fake engine in unit tests    │
-│        └─ CliRadixEngine                                     │
-│             ├─ Semaphore (max concurrent processes)          │
-│             └─ ProcessExecutor ◄── fake in adapter tests     │
-│                  └─ DefaultProcessExecutor                   │
+│ ConversionController          EncodingController             │
+│   └─ ConversionService          └─ EncodingService           │
+│        └─ RadixEngine                 └─ EncodingEngine      │
+│             └─ CliRadixEngine              └─ CliEncodingEngine│
+│                        └──────────┬──────────────┘           │
+│                            CliEngineClient                   │
+│                              ├─ shared Semaphore              │
+│                              ├─ shared timeout policy         │
+│                              └─ ProcessExecutor ◄── fake tests│
+│                                   └─ DefaultProcessExecutor   │
 └──────────────────────────────┬───────────────────────────────┘
                                │ argv, stdin unused; JSON stdout/stderr
 ┌──────────────────────────────▼───────────────────────────────┐
 │ radixlab-cli                                                 │
-│   └─ RadixConverter                                          │
-│        └─ RationalParser ─► Rational ─► cpp_int arithmetic   │
+│   ├─ conversion: RationalParser → RadixConverter             │
+│   └─ encoding: BitVector, signed, BCD, Gray, parity          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 There is no shell in the Java-to-C++ path. The CLI is a stable, testable process
-interface rather than an RPC framework or JNI bridge.
+interface rather than an RPC framework or JNI bridge. Conversion and encoding
+share one process client, so they also share timeouts and process-slot limits.
 
 ## C++ core
 
@@ -106,8 +109,68 @@ cycle such as `0.(3)` to be reported at a fractional limit of one.
 ### Resource bounds
 
 The library itself accepts a caller-provided fractional limit. The CLI and API
-enforce a maximum input length of 4096 and a maximum fractional limit of 4096.
+enforce a maximum conversion input length of 4096 and a maximum fractional limit
+of 4096. Encoding width is capped at 64 bits and BCD input at 1024 digits.
 These are application policy limits, not mathematical limits.
+
+## Encoding core
+
+The v0.2.0 module separates a bit pattern from its interpretation.
+
+### `BitVector`
+
+`BitVector` stores an unsigned `cpp_int` pattern and a width from 1 to 64. It is
+not a signed number. It validates that the pattern fits the width, renders binary
+and hexadecimal forms, reads indexed bits (index 0 is LSB), performs logical
+shifts, masks bitwise NOT to the declared width, and supports bit set/flip. All
+masks use `cpp_int`, avoiding 64-bit signed overflow and shifting past a native
+integer.
+
+Logical shifts define a complete result: vacant bits are zero, discarded high
+bits are truncated, and a shift by at least the width is zero. Signed behavior is
+never implicit; it belongs to a signed encoding.
+
+### Signed encodings
+
+`SignedEncoding` selects sign-magnitude, ones' complement, or two's complement.
+Ranges are calculated from the width and checked before encoding. Overflow raises
+`RangeError`; it is never handled by masking or truncating the input.
+
+For width `n`, the minimum and maximum are:
+
+- Sign-magnitude / ones' complement: `-(2^(n-1)-1)` through `2^(n-1)-1`.
+- Two's complement: `-2^(n-1)` through `2^(n-1)-1`.
+
+Sign-magnitude and ones' complement have two bit patterns for zero. The API
+exposes the distinction with `negativeZero` for both encoding and decoding, while
+two's complement rejects a negative-zero request. Decoding a sign-magnitude
+`10000000` or ones' complement all-ones word therefore returns numeric value zero
+with `negativeZero=true` rather than losing that information.
+
+### BCD
+
+`encodeBcd` accepts a non-empty string of decimal digits and preserves leading
+zeros. Each digit is emitted as a 4-bit group; `value` is accumulated separately
+for numerical comparison and for an ordinary binary rendering. `decodeBcd` keeps
+group boundaries, accepts optional spaces for readability, requires a non-empty
+multiple of four bits, and rejects any nibble outside `0000-1001`. This version
+defines no negative BCD protocol.
+
+### Gray code
+
+`binaryToGray` computes `G = B xor (B >> 1)`. `grayToBinary` reconstructs the
+binary word from the most-significant bit downward. Width is explicit, values are
+unsigned, and conversion is integer-only. Tests verify round trips and that every
+adjacent pair in the 4-bit and 8-bit sequences differs in exactly one bit.
+
+### Parity
+
+`generateParity` counts the ones and emits the bit that makes the data-plus-parity
+word even or odd. The parity bit is appended at the right in the string form. The
+CLI/API also expose a single-bit flip experiment: the original and received data
+are both reported, and the receiver recomputes parity independently of the
+transmitted bit. The model intentionally documents that single-bit parity cannot
+detect all even numbers of errors and cannot locate or correct an error.
 
 ## CLI contract
 
@@ -118,7 +181,17 @@ radixlab-cli \
   --to 16 \
   --max-fraction-digits 256 \
   --json
+
+radixlab-cli encoding \
+  --operation signed-encode \
+  --value -13 --width 8 \
+  --encoding TWOS_COMPLEMENT \
+  --json
 ```
+
+The `encoding` namespace currently supports `signed-encode`, `signed-decode`,
+`bcd-encode`, `bcd-decode`, `gray-encode`, `gray-decode`, and `parity`. See
+`radixlab-cli encoding --help`.
 
 Success writes exactly one JSON object to stdout:
 
@@ -135,20 +208,20 @@ Success writes exactly one JSON object to stdout:
 }
 ```
 
-Without `--json`, stdout contains the result and a newline. Errors go to stderr.
-When `--json` is present, errors are JSON even if argument parsing failed. Exit
-codes are `0` success, `1` internal failure, `2` invalid input/arguments, and
-`3` resource limit.
+Without `--json`, stdout contains a concise result. Errors go to stderr. When
+`--json` is present, errors are JSON even if argument parsing failed. Exit codes
+are `0` success, `1` internal failure, `2` invalid input/arguments, `3` resource
+limit, and `4` value outside the representable encoding range.
 
 ## Java backend
 
 ### Request pipeline
 
 1. Jackson binds the JSON body.
-2. Jakarta Bean Validation enforces shape, length, and base ranges.
+2. Jakarta Bean Validation enforces shape, length, base, and bit constraints.
 3. `ConversionService` applies the default fraction limit (256).
-4. `CliRadixEngine` acquires a process slot.
-5. `ProcessExecutor` starts the CLI with an argument vector.
+4. `CliRadixEngine` or `CliEncodingEngine` builds an argument vector.
+5. `CliEngineClient` acquires a process slot and invokes `ProcessExecutor`.
 6. stdout and stderr are drained concurrently on virtual threads.
 7. A timeout terminates the child, first gracefully and then forcibly.
 8. Exit code and JSON determine the result or a typed exception.
@@ -156,11 +229,11 @@ codes are `0` success, `1` internal failure, `2` invalid input/arguments, and
 
 ### Replaceable boundaries
 
-`RadixEngine` is the service boundary. `ConversionServiceTest` substitutes it
-without touching processes. `ProcessExecutor` is the OS boundary.
-`CliRadixEngineTest` substitutes it to verify command construction, output
-parsing, timeout mapping, and capacity handling deterministically.
-`ConversionIntegrationTest` uses the real C++ binary through HTTP.
+`RadixEngine` is the service boundary. `ConversionServiceTest` and `EncodingServiceTest` substitute them without
+touching processes. `ProcessExecutor` is the OS boundary. `CliRadixEngineTest`
+and `CliEncodingEngineTest` substitute it to verify command construction, output
+parsing, timeout mapping, and range mapping. `ConversionIntegrationTest` and
+`EncodingIntegrationTest` use the real C++ binary through HTTP.
 
 ### Failure mapping
 
@@ -168,7 +241,8 @@ parsing, timeout mapping, and capacity handling deterministically.
 | --- | --- | --- |
 | Bean validation failure | `MethodArgumentNotValidException` | 400 |
 | Malformed JSON | `HttpMessageNotReadableException` | 400 |
-| CLI input rejection | `InvalidNumberException` | 400 |
+| CLI input rejection | `InvalidNumberException` / `InvalidEncodingException` | 400 |
+| Representable-range rejection | `UnrepresentableValueException` | 422 |
 | Process timeout | `EngineTimeoutException` | 504 |
 | No process slot | `EngineBusyException` | 503 |
 | Start/read/abnormal exit/JSON failure | `EngineFailureException` | 502 |
@@ -180,8 +254,9 @@ syntax.
 
 ## Front end
 
-Spring Boot serves `src/main/resources/static/index.html` and its assets. The
-page uses no framework and no external network assets. It:
+Spring Boot serves `src/main/resources/static/index.html`, the v0.2.0
+`encoding.html` Encoding Lab, and their assets. Neither page uses a framework or
+external network assets. The converter:
 
 - populates bases 2–36 locally;
 - validates the numeral shape and source-base digits before sending;
@@ -191,6 +266,11 @@ page uses no framework and no external network assets. It:
 - distinguishes repeating and truncated output;
 - exposes errors in a live region and uses visible focus styles.
 
+The Encoding Lab adds a keyboard-operable tab list and four live explorers:
+signed encode/decode, BCD groups, Gray transitions with changed-bit highlighting,
+and parity generation with an optional single-bit flip. Results are rendered with
+`textContent`, not injected HTML.
+
 ## Testing strategy
 
 | Layer | Tests |
@@ -199,10 +279,17 @@ page uses no framework and no external network assets. It:
 | Rational | 9 assertions: normalization, signs, zero, arbitrary precision |
 | Rational parser | 18 assertions: bases, fractions, malformed input |
 | Converter | 32 assertions: examples, signs, cycles, truncation, large values |
-| CLI process | 14 checks: plain/JSON output, exit codes, limits, stderr |
-| Java unit | Service mapping, CLI adapter, process adapter, concurrency |
-| Java web | `@WebMvcTest` validation and error statuses |
-| Integration | HTTP → Spring → real CLI → C++ engine, plus static UI |
+| BitVector | 56 assertions: widths, reads, strings, shifts, masks, validation |
+| Signed encodings | 52 assertions: three forms, ranges, negative zero, 4–64 bits |
+| BCD | 26 assertions: groups, leading zeros, illegal nibbles, comparison |
+| Gray code | 17 assertions: known sequence, adjacency, round trips, 64-bit boundary |
+| Parity | 23 assertions: even/odd, flips, undetected double flips, 64-bit |
+| CLI process | 24 checks: conversion/encoding output, JSON, exit codes, limits |
+| Java unit | Service mapping, CLI adapters, process adapter, concurrency |
+| Java web | `@WebMvcTest` validation and error statuses for both API families |
+| Integration | HTTP → Spring → real CLI → C++ conversion and encoding, plus both UIs |
+
+Total: 258 C++ assertions, 24 CLI checks, and 55 JUnit tests.
 
 Tests do not rely on `assert()` being enabled, so Debug and Release C++ builds
 run the same checks. CI rejects failures rather than ignoring them.
@@ -211,7 +298,7 @@ run the same checks. CI rejects failures rather than ignoring them.
 
 ### Process per request
 
-This MVP starts one CLI process per conversion. It provides a small, strongly
+This MVP starts one CLI process per conversion or encoding request. It provides a small, strongly
 isolated interface and a language boundary that is trivial to inspect and test.
 The costs are process-start overhead, a fixed concurrency ceiling, and the need
 to supervise every child process. `Semaphore`, timeouts, forced termination, and
@@ -233,3 +320,6 @@ input limits exist.
 The process protocol is inspectable and works in every shell. It avoids port
 allocation and RPC lifecycle management. The trade-off is parsing overhead and
 the need to keep stdout reserved strictly for one result object.
+
+Both API families share the same `CliEngineClient`, preserving one timeout
+policy, one process-slot semaphore, and one test seam.
