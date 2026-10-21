@@ -137,15 +137,6 @@ design trade-offs.
 Install Boost on macOS with `brew install boost`. On Debian/Ubuntu, install
 `libboost-dev`.
 
-After cloning, enable the repository-local commit-message guard:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-The hook rejects unauthorized AI/tool attribution without changing global Git
-configuration or legitimate human co-author trailers.
-
 ## Build and test the C++ engine
 
 ```bash
@@ -377,6 +368,12 @@ docs/
   API.md ARCHITECTURE.md DEVELOPMENT.md THIRD_PARTY.md
 .github/workflows/             CI gates
 ```
+
+## Development
+
+AI-assisted development tools, including Claude Code, have been used in this
+project. Project ownership and release decisions remain with the repository
+maintainer.
 
 ## Known limitations
 

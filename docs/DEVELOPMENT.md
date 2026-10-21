@@ -37,26 +37,10 @@ Build output is ignored. Do not commit:
 
 - `cpp-core/build/`
 - `java-backend/target/`
-- `.env` files, tokens, local paths, logs, or IDE metadata.
+- `.env` files, tokens, local paths, logs, IDE metadata, or `.claude/` local settings.
 
 The C++ library has no generated source. The Java jar is reproducible from the
 Maven project and is not committed.
-
-### Attribution policy
-
-Project authorship belongs to the repository owner and real Git contributors.
-The project-level `.claude/settings.json` disables AI commit/PR attribution, and
-`.githooks/commit-msg` rejects unauthorized AI/tool trailers or attribution text.
-Enable the local guard after cloning:
-
-```bash
-chmod +x .githooks/commit-msg
-git config core.hooksPath .githooks
-```
-
-This setting is local to the repository and does not alter global Git identity or
-block legitimate human co-authors. Existing published history is never rewritten
-to enforce the policy.
 
 ## C++ workflow
 
@@ -198,13 +182,11 @@ requires the binary to be on `PATH`.
 
 ## CI gates
 
-`.github/workflows/ci.yml` has four independent jobs:
+`.github/workflows/ci.yml` has three independent jobs:
 
 1. **C++ / Debug and Release** — compile and run CTest on Ubuntu.
 2. **Java unit tests** — Maven unit, controller, adapter, and process tests.
-3. **Attribution policy** — scan only the new commit range for unauthorized AI/tool
-   attribution; published history is not rewritten.
-4. **End-to-end integration** — build the real CLI, then run `mvn verify` so the
+3. **End-to-end integration** — build the real CLI, then run `mvn verify` so the
    HTTP integration suite invokes C++.
 
 The workflow installs Boost with `apt`, sets up Temurin 21, and uses no
@@ -253,5 +235,5 @@ For the jar, append `--server.port=8081`.
 4. CI jobs pass on the pushed commit.
 5. README, API, course notes, and observed outputs agree.
 6. No secrets or build artifacts are staged.
-7. New commits contain no unauthorized AI/tool attribution.
+7. Commit authorship and repository metadata are reviewed before release.
 8. Version strings agree across CMake, CLI, `pom.xml`, and release tag.
