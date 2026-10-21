@@ -477,6 +477,11 @@ function updateGraySteppers(numericValue, width) {
     grayNext.disabled = numericValue >= maximum;
 }
 
+function disableGraySteppers() {
+    grayPrev.disabled = true;
+    grayNext.disabled = true;
+}
+
 function renderGray(current, previous) {
     grayValueOutput.textContent = current.value;
     renderBitGrid(grayBinaryGrid, current.binary, {
@@ -522,6 +527,7 @@ async function refreshGray() {
     if (!digitsOnly(text) || !valueLength(text, 64)) {
         setBusy(grayForm, false);
         clearGrayDisplay();
+        disableGraySteppers();
         setStatus(grayStatus, "Invalid input", "error");
         showError(grayError, "Enter an unsigned decimal integer of at most 64 digits.");
         return;
@@ -533,6 +539,7 @@ async function refreshGray() {
     } catch {
         setBusy(grayForm, false);
         clearGrayDisplay();
+        disableGraySteppers();
         setStatus(grayStatus, "Invalid input", "error");
         showError(grayError, "The value is not a valid integer.");
         return;
@@ -542,7 +549,7 @@ async function refreshGray() {
     if (numericValue > maximum) {
         setBusy(grayForm, false);
         clearGrayDisplay();
-        updateGraySteppers(numericValue, width);
+        disableGraySteppers();
         setStatus(grayStatus, "Out of range", "error");
         showError(grayError, `Value ${text} does not fit in ${width} bits (maximum ${maximum}).`);
         return;
@@ -576,6 +583,7 @@ async function refreshGray() {
             return;
         }
         clearGrayDisplay();
+        disableGraySteppers();
         setStatus(grayStatus, "Error", "error");
         showError(grayError, error.message);
     } finally {
@@ -613,6 +621,7 @@ grayForm.addEventListener("submit", (event) => {
     refreshGray();
 });
 
+disableGraySteppers();
 panelInitializers.set("gray", refreshGray);
 
 /* -------------------------------------------------------------------------
