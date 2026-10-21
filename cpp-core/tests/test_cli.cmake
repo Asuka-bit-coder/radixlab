@@ -101,7 +101,7 @@ endfunction()
 
 expect_cli(
     "version comes from the build"
-    0 "radixlab-cli 0.2.0"
+    0 "radixlab-cli 0.3.0"
     --version
 )
 
@@ -253,6 +253,62 @@ expect_stdout_contains(
     "encoding help"
     0 "Digital logic encodings"
     encoding --help
+)
+
+expect_stdout_contains(
+    "Boolean evaluate JSON"
+    0 "\"result\":true"
+    boolean evaluate --expression "A & (!B | C)"
+    --assignment "A=1,B=0,C=0" --json
+)
+
+expect_stdout_contains(
+    "Boolean truth table"
+    0 "\"rowCount\":4"
+    boolean truth-table --expression "A & B" --json
+)
+
+expect_stdout_contains(
+    "Boolean canonical SOP"
+    0 "\"sop\":\"(!A & B) | (A & !B)\""
+    boolean canonical-forms --expression "A ^ B" --json
+)
+
+expect_stdout_contains(
+    "Boolean equivalence"
+    0 "\"equivalent\":true"
+    boolean equivalent --left "!(A & B)" --right "!A | !B" --json
+)
+
+expect_stdout_contains(
+    "Boolean counterexample"
+    0 "\"left\":false,\"right\":true"
+    boolean equivalent --left "A & B" --right "A | B" --json
+)
+
+expect_cli_error(
+    "Boolean parse error position"
+    2 "\"column\":5"
+    boolean truth-table --expression "A & | B" --json
+)
+
+expect_cli_error(
+    "Boolean variable limit"
+    3 "6 distinct variables"
+    boolean truth-table --expression "A | B | C | D | E | F | G" --json
+)
+
+expect_cli_error(
+    "Boolean missing assignment"
+    2 "Missing value for variable B"
+    boolean evaluate --expression "A & B" --assignment "A=1" --json
+)
+
+string(REPEAT "A" 1025 oversized_boolean)
+expect_cli_error(
+    "Boolean request length limit"
+    3 "1024-character"
+    boolean truth-table --expression "${oversized_boolean}" --json
 )
 
 message(STATUS "CLI checks passed: ${passed}")

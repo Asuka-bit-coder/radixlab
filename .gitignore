@@ -23,7 +23,7 @@ replay_pid*
 !.env.example
 *.local
 secrets/
-.claude/settings.local.json
+.claude/
 
 # Logs and coverage
 *.log

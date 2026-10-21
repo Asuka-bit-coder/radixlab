@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     radixlab
-    VERSION 0.2.0
-    DESCRIPTION "Exact radix conversion and digital logic encoding engine"
+    VERSION 0.3.0
+    DESCRIPTION "Exact radix conversion, encoding, and Boolean algebra engine"
     LANGUAGES CXX
 )
 
@@ -50,6 +50,13 @@ add_library(radixlab_core STATIC
     src/encoding/bcd.cpp
     src/encoding/gray_code.cpp
     src/encoding/parity.cpp
+    src/boolean/lexer.cpp
+    src/boolean/ast.cpp
+    src/boolean/parser.cpp
+    src/boolean/evaluator.cpp
+    src/boolean/truth_table.cpp
+    src/boolean/canonical_forms.cpp
+    src/boolean/equivalence.cpp
 )
 
 target_include_directories(radixlab_core PUBLIC
@@ -68,6 +75,7 @@ add_executable(radixlab-cli
     cli/main.cpp
     cli/cli_io.cpp
     cli/encoding_commands.cpp
+    cli/boolean_commands.cpp
 )
 
 target_link_libraries(radixlab-cli PRIVATE
@@ -139,6 +147,26 @@ if(BUILD_TESTING)
     target_link_libraries(test_parity PRIVATE radixlab_core)
     radixlab_enable_warnings(test_parity)
 
+    add_executable(test_boolean_lexer tests/test_boolean_lexer.cpp)
+    target_link_libraries(test_boolean_lexer PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_boolean_lexer)
+
+    add_executable(test_boolean_parser tests/test_boolean_parser.cpp)
+    target_link_libraries(test_boolean_parser PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_boolean_parser)
+
+    add_executable(test_boolean_evaluator tests/test_boolean_evaluator.cpp)
+    target_link_libraries(test_boolean_evaluator PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_boolean_evaluator)
+
+    add_executable(test_boolean_truth_table tests/test_boolean_truth_table.cpp)
+    target_link_libraries(test_boolean_truth_table PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_boolean_truth_table)
+
+    add_executable(test_boolean_equivalence tests/test_boolean_equivalence.cpp)
+    target_link_libraries(test_boolean_equivalence PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_boolean_equivalence)
+
     add_test(NAME RadixParserTests COMMAND test_parser)
     add_test(NAME RationalTests COMMAND test_rational)
     add_test(NAME RationalParserTests COMMAND test_rational_parser)
@@ -148,6 +176,11 @@ if(BUILD_TESTING)
     add_test(NAME BcdTests COMMAND test_bcd)
     add_test(NAME GrayCodeTests COMMAND test_gray_code)
     add_test(NAME ParityTests COMMAND test_parity)
+    add_test(NAME BooleanLexerTests COMMAND test_boolean_lexer)
+    add_test(NAME BooleanParserTests COMMAND test_boolean_parser)
+    add_test(NAME BooleanEvaluatorTests COMMAND test_boolean_evaluator)
+    add_test(NAME BooleanTruthTableTests COMMAND test_boolean_truth_table)
+    add_test(NAME BooleanEquivalenceTests COMMAND test_boolean_equivalence)
 
     add_test(
         NAME CliTests

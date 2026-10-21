@@ -1,4 +1,5 @@
 #include "cli_io.hpp"
+#include "boolean_commands.hpp"
 #include "encoding_commands.hpp"
 #include "radixlab/radix_converter.hpp"
 
@@ -36,9 +37,10 @@ void printUsage(std::ostream& stream) {
         << "Usage:\n"
         << "  radixlab-cli --input NUMERAL --from BASE --to BASE [options]\n"
         << "  radixlab-cli encoding --operation OP [options]\n"
+        << "  radixlab-cli boolean OPERATION [options]\n"
         << "\n"
-        << "Convert an exact positional numeral between bases 2 and 36, or\n"
-        << "run a digital logic encoding experiment.\n"
+        << "Convert an exact positional numeral, run a digital logic encoding\n"
+        << "experiment, or analyze a Boolean expression.\n"
         << "\n"
         << "Conversion options:\n"
         << "  --input VALUE                Numeral to convert (required)\n"
@@ -53,6 +55,10 @@ void printUsage(std::ostream& stream) {
         << "  signed-encode, signed-decode, bcd-encode, bcd-decode,\n"
         << "  gray-encode, gray-decode, parity\n"
         << "  Run 'radixlab-cli encoding --help' for their options.\n"
+        << "\n"
+        << "Boolean operations:\n"
+        << "  evaluate, truth-table, canonical-forms, equivalent\n"
+        << "  Run 'radixlab-cli boolean --help' for their options.\n"
         << "\n"
         << "Exit codes:\n"
         << "  0  success\n"
@@ -252,6 +258,11 @@ int runConversion(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     try {
+        if (argc > 1
+            && radixlab::cli::isBooleanCommand(argv[1])) {
+            return radixlab::cli::runBooleanCommand(argc, argv);
+        }
+
         if (argc > 1
             && radixlab::cli::isEncodingCommand(argv[1])) {
             return radixlab::cli::runEncodingCommand(argc, argv);

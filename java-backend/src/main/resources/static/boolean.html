@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="RadixLab Boolean Lab: parse Boolean expressions, inspect the AST, generate truth tables and canonical forms, and compare expressions for logical equivalence.">
+    <title>Boolean Lab — RadixLab</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="boolean.css">
+</head>
+<body>
+    <a class="skip-link" href="#boolean-workspace">Skip to Boolean Lab</a>
+
+    <header class="site-header">
+        <a class="brand" href="index.html" aria-label="RadixLab home">
+            <span class="brand-mark" aria-hidden="true">R</span>
+            <span>RadixLab</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="index.html">Converter</a>
+            <a href="encoding.html">Encoding Lab</a>
+            <a href="boolean.html" aria-current="page">Boolean Lab</a>
+        </nav>
+    </header>
+
+    <main class="page boolean-page">
+        <section class="boolean-intro" aria-labelledby="boolean-title">
+            <p class="eyebrow">Boolean Algebra · Expression Engine</p>
+            <h1 id="boolean-title">From expression<br>to proof.</h1>
+            <p class="lede">
+                Parse a Boolean expression into an owned syntax tree, enumerate
+                its truth table, derive canonical SOP and POS, and test logical
+                equivalence with a concrete counterexample.
+            </p>
+            <div class="boolean-operators" aria-label="Operator precedence">
+                <span><code>!</code> NOT</span>
+                <span class="operator-arrow" aria-hidden="true">&gt;</span>
+                <span><code>&amp;</code> AND</span>
+                <span class="operator-arrow" aria-hidden="true">&gt;</span>
+                <span><code>^</code> XOR</span>
+                <span class="operator-arrow" aria-hidden="true">&gt;</span>
+                <span><code>|</code> OR</span>
+            </div>
+        </section>
+
+        <section id="boolean-workspace" class="boolean-workbench" aria-label="Boolean expression workspace">
+            <form id="boolean-form" class="boolean-composer" novalidate>
+                <div class="composer-heading">
+                    <div>
+                        <p class="eyebrow">Expression editor</p>
+                        <h2>What should evaluate?</h2>
+                    </div>
+                    <span id="boolean-status" class="lab-status">Ready</span>
+                </div>
+
+                <label for="boolean-expression">Boolean expression</label>
+                <div class="expression-input-row">
+                    <input id="boolean-expression" type="text"
+                           value="A &amp; (B | !C)"
+                           maxlength="1024" autocomplete="off"
+                           autocapitalize="off" spellcheck="false"
+                           aria-describedby="expression-help expression-error">
+                    <button class="primary-button expression-button" type="submit">
+                        Analyze
+                    </button>
+                </div>
+                <p id="expression-help" class="field-help">
+                    Variables A–Z, constants 0/1, parentheses. Binary operators are
+                    left-associative; implicit operators are rejected.
+                </p>
+                <pre id="expression-marker" class="expression-marker" aria-hidden="true" hidden></pre>
+                <div id="expression-error" class="lab-error" role="alert" hidden></div>
+
+                <div class="expression-examples" aria-label="Example expressions">
+                    <span>Try</span>
+                    <button type="button" class="expression-example"
+                            data-expression="A &amp; (B | !C)">A &amp; (B | !C)</button>
+                    <button type="button" class="expression-example"
+                            data-expression="!(A &amp; B) | C">De Morgan shape</button>
+                    <button type="button" class="expression-example"
+                            data-expression="(A &amp; B) ^ (B | C)">Mixed precedence</button>
+                    <button type="button" class="expression-example"
+                            data-expression="1">Constant 1</button>
+                </div>
+            </form>
+
+            <div class="boolean-grid">
+                <article class="boolean-card ast-card" aria-labelledby="ast-title">
+                    <div class="boolean-card-heading">
+                        <div>
+                            <p class="eyebrow">AST Explorer</p>
+                            <h2 id="ast-title">Syntax tree</h2>
+                        </div>
+                        <span id="ast-count" class="mini-meta">— nodes</span>
+                    </div>
+                    <div id="ast-tree" class="ast-tree" aria-live="polite">
+                        <p class="empty-lab">Enter an expression to build its tree.</p>
+                    </div>
+                    <p class="card-note">
+                        Ownership flows from the root through <code>unique_ptr</code>
+                        children. Evaluating a node recursively asks its operands.
+                    </p>
+                </article>
+
+                <article class="boolean-card truth-card" aria-labelledby="truth-title">
+                    <div class="boolean-card-heading">
+                        <div>
+                            <p class="eyebrow">Truth Table</p>
+                            <h2 id="truth-title">Every assignment</h2>
+                        </div>
+                        <span id="truth-row-count" class="mini-meta">— rows</span>
+                    </div>
+
+                    <div id="truth-variables" class="truth-toggles"
+                         aria-label="Variable assignment"></div>
+
+                    <div class="truth-table-wrap">
+                        <table class="truth-table">
+                            <thead id="truth-table-head"></thead>
+                            <tbody id="truth-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <p id="truth-selected" class="truth-selected">
+                        Select a row or toggle a variable.
+                    </p>
+                </article>
+            </div>
+
+            <article class="boolean-card canonical-card" aria-labelledby="canonical-title">
+                <div class="boolean-card-heading">
+                    <div>
+                        <p class="eyebrow">Canonical Forms</p>
+                        <h2 id="canonical-title">Minterms and maxterms</h2>
+                    </div>
+                    <span id="canonical-variable-count" class="mini-meta">— variables</span>
+                </div>
+
+                <div class="canonical-indices">
+                    <div>
+                        <span>Minterms Σm</span>
+                        <code id="canonical-minterms">—</code>
+                    </div>
+                    <div>
+                        <span>Maxterms ΠM</span>
+                        <code id="canonical-maxterms">—</code>
+                    </div>
+                </div>
+
+                <div class="canonical-forms">
+                    <section>
+                        <h3>Canonical SOP</h3>
+                        <pre id="canonical-sop" class="formula-block">—</pre>
+                    </section>
+                    <section>
+                        <h3>Canonical POS</h3>
+                        <pre id="canonical-pos" class="formula-block">—</pre>
+                    </section>
+                </div>
+                <p class="card-note">
+                    These are complete canonical expansions, not minimized
+                    expressions. Variable order follows the truth-table header.
+                </p>
+            </article>
+
+            <article class="boolean-card equivalence-card" aria-labelledby="equivalence-title">
+                <div class="boolean-card-heading">
+                    <div>
+                        <p class="eyebrow">Equivalence Checker</p>
+                        <h2 id="equivalence-title">Two expressions, one function?</h2>
+                    </div>
+                    <span id="equivalence-status" class="lab-status">Ready</span>
+                </div>
+
+                <form id="equivalence-form" class="equivalence-form" novalidate>
+                    <div class="equivalence-inputs">
+                        <div class="field">
+                            <label for="equivalence-left">Left expression</label>
+                            <input id="equivalence-left" type="text"
+                                   value="!(A &amp; B)" maxlength="1024"
+                                   autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="equivalence-symbol" aria-hidden="true">≡?</div>
+                        <div class="field">
+                            <label for="equivalence-right">Right expression</label>
+                            <input id="equivalence-right" type="text"
+                                   value="!A | !B" maxlength="1024"
+                                   autocomplete="off" spellcheck="false">
+                        </div>
+                    </div>
+                    <button class="primary-button equivalence-button" type="submit">
+                        Compare expressions
+                    </button>
+                </form>
+
+                <div id="equivalence-error" class="lab-error" role="alert" hidden></div>
+
+                <div id="equivalence-result" class="equivalence-result" aria-live="polite">
+                    <div id="equivalence-verdict" class="equivalence-verdict">
+                        Press Compare to test logical equivalence.
+                    </div>
+                    <div id="equivalence-normalized" class="equivalence-normalized" hidden>
+                        <div><span>Left</span><code id="equivalence-left-normalized"></code></div>
+                        <div><span>Right</span><code id="equivalence-right-normalized"></code></div>
+                    </div>
+                    <div id="counterexample" class="counterexample" hidden>
+                        <h3>Counterexample</h3>
+                        <div id="counterexample-body"></div>
+                    </div>
+                </div>
+
+                <p class="card-note">
+                    Equivalence compares complete truth tables over the union of
+                    variables. Different-looking expressions may be equivalent;
+                    different variable names alone never force equality.
+                </p>
+            </article>
+        </section>
+
+        <section class="lab-footer-note">
+            <p>
+                Expressions are parsed and evaluated in the C++20 engine through
+                the RadixLab REST API. Truth-table variables are ordered A–Z with
+                the first variable as the most-significant bit.
+            </p>
+            <a href="encoding.html">Open the Encoding Lab →</a>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>RadixLab v0.3.0 · Boolean Algebra Lab</p>
+        <code>/api/v1/boolean/*</code>
+    </footer>
+
+    <script src="boolean.js" defer></script>
+</body>
+</html>

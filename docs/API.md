@@ -2,7 +2,8 @@
 
 Base URL in local development: `http://localhost:8080`
 
-The API has one radix-conversion endpoint and seven encoding endpoints.
+The API has one radix-conversion endpoint, seven encoding endpoints, and four
+Boolean endpoints.
 Static UI assets are served from `/` and `/encoding.html`.
 
 ## Convert a numeral
@@ -327,6 +328,179 @@ Response:
 Parity can detect an odd number of flipped bits; it can miss an even number and
 cannot locate or correct errors.
 
+
+## Boolean API
+
+Boolean requests accept expressions with variables A–Z, constants `0`/`1`,
+`!`, `&`, `^`, `|`, and parentheses. Precedence is `! > & > ^ > |`; binary
+operators are left-associative. Expressions are limited to 1024 characters.
+Truth tables, canonical forms, and equivalence checks are limited to 6 distinct
+variables. Unknown characters and syntax errors return HTTP 400 with a precise
+position.
+
+### Evaluate
+
+```http
+POST /api/v1/boolean/evaluate
+```
+
+```json
+{
+  "expression": "A & (!B | C)",
+  "assignment": {"A": true, "B": false, "C": false}
+}
+```
+
+The assignment map is optional; if omitted it is treated as empty. Every
+variable used by an evaluated path must have a value. A missing variable returns
+400. Assignment keys must be single uppercase letters.
+
+Response:
+
+```json
+{
+  "expression": "A & (!B | C)",
+  "normalized": "(A & (!B | C))",
+  "variables": ["A", "B", "C"],
+  "assignment": {"A": true, "B": false, "C": false},
+  "result": true,
+  "ast": {
+    "type": "and",
+    "left": {"type": "variable", "name": "A"},
+    "right": {
+      "type": "or",
+      "left": {"type": "not", "operand": {"type": "variable", "name": "B"}},
+      "right": {"type": "variable", "name": "C"}
+    }
+  }
+}
+```
+
+### Truth table
+
+```http
+POST /api/v1/boolean/truth-table
+```
+
+Request:
+
+```json
+{"expression":"A & B"}
+```
+
+Response:
+
+```json
+{
+  "expression": "A & B",
+  "normalized": "(A & B)",
+  "variables": ["A", "B"],
+  "rowCount": 4,
+  "rows": [
+    {"index":0,"assignment":{"A":false,"B":false},"result":false},
+    {"index":1,"assignment":{"A":false,"B":true},"result":false},
+    {"index":2,"assignment":{"A":true,"B":false},"result":false},
+    {"index":3,"assignment":{"A":true,"B":true},"result":true}
+  ],
+  "ast": {
+    "type": "and",
+    "left": {"type": "variable", "name": "A"},
+    "right": {"type": "variable", "name": "B"}
+  }
+}
+```
+
+Variables are sorted A–Z. The first variable is the most-significant bit of the
+row index. A constant expression has one row and an empty assignment.
+
+### Canonical forms
+
+```http
+POST /api/v1/boolean/canonical
+```
+
+Request:
+
+```json
+{"expression":"A ^ B"}
+```
+
+Response:
+
+```json
+{
+  "expression": "A ^ B",
+  "normalized": "(A ^ B)",
+  "variables": ["A", "B"],
+  "rowCount": 4,
+  "minterms": [1, 2],
+  "maxterms": [0, 3],
+  "sop": "(!A & B) | (A & !B)",
+  "pos": "(A | B) & (!A | !B)",
+  "ast": {"type":"xor"}
+}
+```
+
+Minterms are the row indices where the result is 1; maxterms are the row
+indices where it is 0. These are canonical expansions, not minimized
+expressions. Generated forms are reparsed and checked against the original
+truth table by the engine.
+
+### Equivalence
+
+```http
+POST /api/v1/boolean/equivalent
+```
+
+Request:
+
+```json
+{"leftExpression":"A & B","rightExpression":"A | B"}
+```
+
+Response when different:
+
+```json
+{
+  "leftExpression": "A & B",
+  "rightExpression": "A | B",
+  "leftNormalized": "(A & B)",
+  "rightNormalized": "(A | B)",
+  "variables": ["A", "B"],
+  "equivalent": false,
+  "leftAst": {"type":"and"},
+  "rightAst": {"type":"or"},
+  "counterexample": {
+    "assignment": {"A": false, "B": true},
+    "left": false,
+    "right": true
+  }
+}
+```
+
+The comparison uses the sorted union of both variable sets. When the expressions
+are equivalent, `counterexample` is `null`. A full response always contains both
+ASTs.
+
+### Boolean parse errors
+
+```json
+{
+  "timestamp": "2026-10-21T10:00:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Left expression: Expected a variable, 0, 1, '!', or '('",
+  "path": "/api/v1/boolean/equivalent",
+  "code": "parse_error",
+  "position": 4,
+  "column": 5
+}
+```
+
+`position` is zero-based; `column` is one-based. Limits such as more than six
+variables return 422 with `code: "limit"`. Internal engine failures remain 502
+and do not expose paths or stack traces.
+
 ## Errors
 
 Error responses use a consistent object:
@@ -347,7 +521,7 @@ Error responses use a consistent object:
 | `415 Unsupported Media Type` | request is not JSON |
 | `404 Not Found` | unknown path |
 | `405 Method Not Allowed` | wrong HTTP method |
-| `422 Unprocessable Entity` | signed/Gray value outside the representable range |
+| `422 Unprocessable Entity` | signed/Gray value outside its range, or a Boolean resource limit |
 | `500 Internal Server Error` | unexpected server error |
 | `502 Bad Gateway` | CLI cannot start, exits abnormally, or returns unreadable output |
 | `503 Service Unavailable` | all configured process slots are busy |

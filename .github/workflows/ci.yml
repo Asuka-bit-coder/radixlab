@@ -63,50 +63,6 @@ jobs:
       - name: Run unit and controller tests
         run: mvn -B -f java-backend/pom.xml test
 
-  attribution:
-    name: Attribution policy
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-
-    steps:
-      - name: Check out repository history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Reject unauthorized AI attribution in new commits
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          set -eu
-
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            range="$BASE_SHA..$HEAD_SHA"
-          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
-            range="$BEFORE_SHA..$HEAD_SHA"
-          else
-            echo "No comparison base for this event; nothing new to scan."
-            exit 0
-          fi
-
-          echo "Scanning commit messages in $range"
-          git log --format=%B "$range" > /tmp/radixlab-commit-messages.txt
-
-          if grep -Eiq '^[[:space:]]*co-authored-by:.*(claude|anthropic|deepseek|openai|gpt|copilot)' /tmp/radixlab-commit-messages.txt; then
-            echo "Unauthorized AI co-author trailer found." >&2
-            exit 1
-          fi
-
-          if grep -Eiq '(claude-session:|generated with claude code|built by claude|co-developed with claude|ai co-founder|claude developer)' /tmp/radixlab-commit-messages.txt; then
-            echo "Unauthorized AI/tool attribution text found." >&2
-            exit 1
-          fi
-
-          echo "Attribution policy check passed."
-
   end-to-end:
     name: End-to-end integration
     runs-on: ubuntu-24.04

@@ -122,6 +122,51 @@ public class ApiExceptionHandler {
         );
     }
 
+    @ExceptionHandler(BooleanParseException.class)
+    public ResponseEntity<ApiError> handleBooleanParse(
+            BooleanParseException exception,
+            HttpServletRequest request
+    ) {
+        return response(
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage(),
+                "parse_error",
+                exception.position(),
+                exception.column(),
+                request
+        );
+    }
+
+    @ExceptionHandler(BooleanLimitException.class)
+    public ResponseEntity<ApiError> handleBooleanLimit(
+            BooleanLimitException exception,
+            HttpServletRequest request
+    ) {
+        return response(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                exception.getMessage(),
+                "limit",
+                null,
+                null,
+                request
+        );
+    }
+
+    @ExceptionHandler(InvalidBooleanRequestException.class)
+    public ResponseEntity<ApiError> handleInvalidBoolean(
+            InvalidBooleanRequestException exception,
+            HttpServletRequest request
+    ) {
+        return response(
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage(),
+                "invalid_request",
+                null,
+                null,
+                request
+        );
+    }
+
     @ExceptionHandler(EngineTimeoutException.class)
     public ResponseEntity<ApiError> handleTimeout(
             EngineTimeoutException exception,
@@ -176,12 +221,26 @@ public class ApiExceptionHandler {
             String message,
             HttpServletRequest request
     ) {
+        return response(status, message, null, null, null, request);
+    }
+
+    private static ResponseEntity<ApiError> response(
+            HttpStatus status,
+            String message,
+            String code,
+            Integer position,
+            Integer column,
+            HttpServletRequest request
+    ) {
         ApiError body = new ApiError(
                 Instant.now(),
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                request.getRequestURI()
+                request.getRequestURI(),
+                code,
+                position,
+                column
         );
         return ResponseEntity.status(status).body(body);
     }
