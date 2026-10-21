@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpp:
+    name: C++ / ${{ matrix.build_type }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type:
+          - Debug
+          - Release
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libboost-dev
+
+      - name: Configure
+        run: |
+          cmake -S cpp-core -B cpp-core/build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build cpp-core/build --parallel
+
+      - name: Test
+        run: ctest --test-dir cpp-core/build --output-on-failure
+
+  java:
+    name: Java unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java-backend/pom.xml
+
+      - name: Run unit and controller tests
+        run: mvn -B -f java-backend/pom.xml test
+
+  end-to-end:
+    name: End-to-end integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libboost-dev
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java-backend/pom.xml
+
+      - name: Build and test C++ engine
+        run: |
+          cmake -S cpp-core -B cpp-core/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=ON
+          cmake --build cpp-core/build --parallel
+          ctest --test-dir cpp-core/build --output-on-failure
+
+      - name: Verify Java with the real C++ process
+        env:
+          RADIXLAB_CLI_PATH: ${{ github.workspace }}/cpp-core/build/radixlab-cli
+        run: mvn -B -f java-backend/pom.xml verify
