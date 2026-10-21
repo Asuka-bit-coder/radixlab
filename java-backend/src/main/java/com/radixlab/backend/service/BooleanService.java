@@ -14,6 +14,7 @@ import com.radixlab.backend.engine.BooleanEngine;
 import com.radixlab.backend.engine.BooleanEquivalenceResult;
 import com.radixlab.backend.engine.BooleanEvaluationResult;
 import com.radixlab.backend.engine.BooleanTruthTableResult;
+import com.radixlab.backend.exception.BooleanLimitException;
 import com.radixlab.backend.exception.InvalidBooleanRequestException;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,8 @@ import java.util.TreeMap;
 @Service
 public class BooleanService {
 
+    private static final int MAX_EXPRESSION_LENGTH = 1024;
+
     private final BooleanEngine engine;
 
     public BooleanService(BooleanEngine engine) {
@@ -32,6 +35,7 @@ public class BooleanService {
     }
 
     public BooleanEvaluateResponse evaluate(BooleanEvaluateRequest request) {
+        validateExpression(request.expression());
         Map<String, Boolean> assignment = validateAssignment(
                 request.assignment());
 
@@ -51,6 +55,7 @@ public class BooleanService {
     public BooleanTruthTableResponse truthTable(
             BooleanExpressionRequest request
     ) {
+        validateExpression(request.expression());
         BooleanTruthTableResult result = engine.truthTable(
                 request.expression());
 
@@ -75,6 +80,7 @@ public class BooleanService {
     public BooleanCanonicalResponse canonicalForms(
             BooleanExpressionRequest request
     ) {
+        validateExpression(request.expression());
         BooleanCanonicalResult result = engine.canonicalForms(
                 request.expression());
 
@@ -94,6 +100,8 @@ public class BooleanService {
     public BooleanEquivalentResponse equivalent(
             BooleanEquivalentRequest request
     ) {
+        validateExpression(request.leftExpression());
+        validateExpression(request.rightExpression());
         BooleanEquivalenceResult result = engine.equivalent(
                 request.leftExpression(),
                 request.rightExpression()
@@ -119,6 +127,15 @@ public class BooleanService {
                 result.rightAst(),
                 counterexample
         );
+    }
+
+    private static void validateExpression(String expression) {
+        if (expression != null
+                && expression.length() > MAX_EXPRESSION_LENGTH) {
+            throw new BooleanLimitException(
+                    "Expression exceeds the 1024-character request limit"
+            );
+        }
     }
 
     private static Map<String, Boolean> validateAssignment(

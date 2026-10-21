@@ -375,7 +375,7 @@ content is inserted with `textContent`; no expression becomes HTML.
 | Java web | `@WebMvcTest` validation and error statuses for all three API families |
 | Integration | HTTP → Spring → real CLI → C++, plus all three UIs |
 
-Total: 345 C++ assertions, 34 CLI checks, and 80 JUnit tests.
+Total: 345 C++ assertions, 34 CLI checks, and 81 JUnit tests.
 
 Tests do not rely on `assert()` being enabled, so Debug and Release C++ builds
 run the same checks. CI rejects failures rather than ignoring them.

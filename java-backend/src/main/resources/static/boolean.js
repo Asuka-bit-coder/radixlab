@@ -45,11 +45,17 @@ async function fetchBoolean(path, body) {
 
         return payload;
     } catch (error) {
-        if (error.name === "AbortError") {
+        if (error instanceof BooleanApiError) {
+            throw error;
+        }
+        if (error?.name === "AbortError") {
             throw new BooleanApiError(
                 "The Boolean engine took too long to respond.", 0);
         }
-        throw error;
+        throw new BooleanApiError(
+            "Could not reach the Boolean engine. Check that the server is running.",
+            0
+        );
     } finally {
         window.clearTimeout(timeout);
     }
@@ -113,15 +119,15 @@ function clearExpressionError() {
 }
 
 function showExpressionError(error) {
-    const suffix = error.column === null
-        ? ""
-        : ` (column ${error.column})`;
+    const suffix = Number.isInteger(error.column)
+        ? ` (column ${error.column})`
+        : "";
     expressionError.textContent = `${error.message}${suffix}`;
     expressionError.hidden = false;
     expressionInput.setAttribute("aria-invalid", "true");
     setStatus(booleanStatus, "Parse failed", "error");
 
-    if (error.position !== null) {
+    if (Number.isInteger(error.position)) {
         const source = expressionInput.value;
         expressionMarker.textContent =
             source + "\n" + " ".repeat(Math.max(0, error.position)) + "^";
@@ -255,7 +261,7 @@ function renderAst(node) {
     astCount.textContent = `${countAstNodes(node)} nodes`;
 }
 
-function updateTruthToggles() {
+function updateTruthToggles(focusVariable = null) {
     truthVariables.replaceChildren();
 
     currentVariables.forEach((variable) => {
@@ -273,10 +279,14 @@ function updateTruthToggles() {
             selectedAssignment[variable] ? "true" : "false"
         );
         button.addEventListener("click", () => {
+            const restoreFocus = document.activeElement === button;
             selectedAssignment[variable] = !selectedAssignment[variable];
-            selectMatchingRow();
+            selectMatchingRow(restoreFocus ? variable : null);
         });
         truthVariables.append(button);
+        if (variable === focusVariable) {
+            button.focus();
+        }
     });
 }
 
@@ -331,11 +341,19 @@ function renderTruthTable() {
         tableRow.append(result);
 
         const choose = () => {
+            const restoreFocus = document.activeElement === tableRow;
             selectedIndex = row.index;
             selectedAssignment = { ...row.assignment };
             updateTruthToggles();
             renderTruthTable();
             updateTruthSummary();
+
+            if (restoreFocus) {
+                const selectedRow = truthTableBody.querySelector(
+                    `tr[data-index="${row.index}"]`
+                );
+                selectedRow?.focus();
+            }
         };
 
         tableRow.addEventListener("click", choose);
@@ -373,10 +391,10 @@ function updateTruthSummary() {
         `${assignment} → ${row.result ? "1" : "0"} (row ${row.index})`;
 }
 
-function selectMatchingRow() {
+function selectMatchingRow(focusVariable = null) {
     const row = currentRows.find(rowMatchesSelection);
     selectedIndex = row ? row.index : null;
-    updateTruthToggles();
+    updateTruthToggles(focusVariable);
     renderTruthTable();
     updateTruthSummary();
 }
@@ -501,9 +519,9 @@ function clearEquivalenceError() {
 }
 
 function showEquivalenceError(error) {
-    equivalenceError.textContent = error.column === null
-        ? error.message
-        : `${error.message} (column ${error.column})`;
+    equivalenceError.textContent = Number.isInteger(error.column)
+        ? `${error.message} (column ${error.column})`
+        : error.message;
     equivalenceError.hidden = false;
     if (error.message.startsWith("Left expression")) {
         equivalenceLeft.setAttribute("aria-invalid", "true");
@@ -570,10 +588,10 @@ async function refreshEquivalence() {
     const request = ++equivalenceRequest;
     clearEquivalenceError();
 
-    const left = equivalenceLeft.value.trim();
-    const right = equivalenceRight.value.trim();
+    const left = equivalenceLeft.value;
+    const right = equivalenceRight.value;
 
-    if (left === "" || right === "") {
+    if (left.trim() === "" || right.trim() === "") {
         setBusy(equivalenceForm, false);
         setStatus(equivalenceStatus, "Waiting", "warning");
         equivalenceVerdict.textContent =

@@ -160,6 +160,11 @@ class BooleanIntegrationTest {
                 new BooleanExpressionRequest("A | B | C | D | E | F | G"),
                 String.class
         );
+        ResponseEntity<String> lengthError = restTemplate.postForEntity(
+                "/api/v1/boolean/truth-table",
+                new BooleanExpressionRequest("A".repeat(1025)),
+                String.class
+        );
 
         assertThat(parseError.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(parseError.getBody())
@@ -171,5 +176,11 @@ class BooleanIntegrationTest {
         assertThat(limitError.getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(limitError.getBody()).contains("6 distinct variables");
+
+        assertThat(lengthError.getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(lengthError.getBody())
+                .contains("\"code\":\"limit\"")
+                .contains("1024-character");
     }
 }

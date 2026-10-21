@@ -5,8 +5,9 @@
 namespace radixlab::boolean {
 
 /**
- * Evaluate an expression. Every variable used by the expression must have an
- * entry in assignment; otherwise EvaluationError is thrown.
+ * Evaluate an expression. AND and OR short-circuit, so only variables on an
+ * evaluated path require an assignment entry. A missing required variable
+ * throws EvaluationError.
  */
 [[nodiscard]]
 bool evaluate(const Expr& expression, const Assignment& assignment);

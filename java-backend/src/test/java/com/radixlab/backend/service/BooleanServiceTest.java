@@ -17,6 +17,7 @@ import com.radixlab.backend.engine.BooleanEquivalenceResult;
 import com.radixlab.backend.engine.BooleanEvaluationResult;
 import com.radixlab.backend.engine.BooleanTruthTableResult;
 import com.radixlab.backend.engine.BooleanTruthTableRow;
+import com.radixlab.backend.exception.BooleanLimitException;
 import com.radixlab.backend.exception.InvalidBooleanRequestException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +31,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -107,6 +109,16 @@ class BooleanServiceTest {
         assertThat(response.minterms()).containsExactly(1, 2);
         assertThat(response.maxterms()).containsExactly(0, 3);
         assertThat(response.sop()).contains("!A");
+    }
+
+    @Test
+    void rejectsExpressionsAboveRequestLimit() {
+        assertThatThrownBy(() -> service.truthTable(
+                new BooleanExpressionRequest("A".repeat(1025))))
+                .isInstanceOf(BooleanLimitException.class)
+                .hasMessageContaining("1024-character");
+
+        verifyNoInteractions(engine);
     }
 
     @Test

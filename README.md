@@ -55,6 +55,7 @@ A XOR B      →  (!A & B) | (A & !B)   canonical SOP
 - Interactive Encoding Lab with four keyboard-accessible explorers.
 - Chinese course notes covering theory, algorithms, implementation, experiments,
   pitfalls, exercises, and verification.
+
 ### Boolean Algebra Lab (v0.3.0)
 
 - Formal lexer and recursive-descent parser for `!`, `&`, `^`, `|`, parentheses,
@@ -434,7 +435,7 @@ RADIXLAB_CLI_PATH="$PWD/../cpp-core/build/radixlab-cli" mvn verify
 ```
 
 The current local suites contain 345 C++ assertions, 34 CLI process checks, and
-80 JUnit tests (58 unit/controller plus 22 integration). CI runs Debug and
+81 JUnit tests (59 unit/controller plus 22 integration). CI runs Debug and
 Release C++ builds, Java tests, and the full end-to-end suite on Ubuntu.
 
 ## Project layout
