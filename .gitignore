@@ -1,23 +1,39 @@
-# CMake
+# CMake and native build output
 **/build/
 CMakeFiles/
 CMakeCache.txt
 compile_commands.json
-
-# Compiled files
 *.o
 *.a
 *.so
 *.dylib
+*.dll
 *.exe
 
-# macOS
-.DS_Store
-
-# IDE
-.vscode/
-.idea/
-
-# Java
+# Java and Maven
 target/
 *.class
+*.jar
+hs_err_pid*
+replay_pid*
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+
+# Logs and coverage
+*.log
+coverage/
+*.lcov
+
+# IDE and OS
+.DS_Store
+.vscode/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
