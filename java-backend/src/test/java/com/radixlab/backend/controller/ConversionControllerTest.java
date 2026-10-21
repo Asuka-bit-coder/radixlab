@@ -96,6 +96,25 @@ class ConversionControllerTest {
     }
 
     @Test
+    void rejectsUnsupportedContentType() throws Exception {
+        mockMvc.perform(post("/api/v1/convert")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("1010"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.message").value(
+                        "Content-Type must be application/json"));
+    }
+
+    @Test
+    void rejectsWrongHttpMethod() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/v1/convert"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.message").value(
+                        "HTTP method not supported"));
+    }
+
+    @Test
     void mapsEngineTimeoutToGatewayTimeout() throws Exception {
         when(conversionService.convert(any(ConvertRequest.class)))
                 .thenThrow(new EngineTimeoutException("timeout", null));

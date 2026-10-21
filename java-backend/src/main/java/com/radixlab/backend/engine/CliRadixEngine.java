@@ -106,6 +106,10 @@ public class CliRadixEngine implements RadixEngine {
 
         try {
             JsonNode root = objectMapper.readTree(output.stdout());
+            if (root == null || !root.isObject()) {
+                throw new IOException("Engine response is not a JSON object");
+            }
+
             JsonNode result = root.path("result");
             JsonNode exact = root.path("exact");
             JsonNode truncated = root.path("truncated");
@@ -139,9 +143,11 @@ public class CliRadixEngine implements RadixEngine {
     private String extractEngineMessage(String stderr) {
         try {
             JsonNode root = objectMapper.readTree(stderr);
-            String message = root.path("error").path("message").asText("");
-            if (!message.isBlank()) {
-                return message;
+            if (root != null && root.isObject()) {
+                String message = root.path("error").path("message").asText("");
+                if (!message.isBlank()) {
+                    return message;
+                }
             }
         } catch (IOException ignored) {
             // Fall through to a stable, non-sensitive client message.

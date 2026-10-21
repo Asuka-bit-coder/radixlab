@@ -155,6 +155,16 @@ int main() {
     expectConversion("Negative zero", "-0.0", 10, 2, "0");
     expectConversion("Case-insensitive input", "2af.8", 16, 10, "687.5");
     expectConversion("Explicit positive sign", "+z", 36, 10, "35");
+    expectConversion(
+        "Arbitrary precision above int64",
+        "18446744073709551616", 10, 2,
+        "10000000000000000000000000000000000000000000000000000000000000000"
+    );
+    expectConversion(
+        "Negative arbitrary precision",
+        "-18446744073709551616", 10, 16,
+        "-10000000000000000"
+    );
 
     // Every supported radix boundary.
     expectConversion("Base 2 minimum", "1", 2, 36, "1");

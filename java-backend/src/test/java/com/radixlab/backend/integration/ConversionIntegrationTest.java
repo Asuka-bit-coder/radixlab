@@ -89,6 +89,15 @@ class ConversionIntegrationTest {
     }
 
     @Test
+    void reportsMissingEndpointAsNotFound() {
+        ResponseEntity<String> response = restTemplate.getForEntity(
+                "/api/v1/does-not-exist", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).contains("Resource not found");
+    }
+
+    @Test
     void propagatesInvalidDigitAsClientError() {
         ResponseEntity<String> response = restTemplate.postForEntity(
                 "/api/v1/convert",

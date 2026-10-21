@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <cstddef>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <limits>
@@ -9,6 +10,10 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#ifndef RADIXLAB_VERSION
+#define RADIXLAB_VERSION "dev"
+#endif
 
 namespace {
 
@@ -50,7 +55,7 @@ void printUsage(std::ostream& stream) {
 }
 
 void printVersion() {
-    std::cout << "radixlab-cli 0.1.0\n";
+    std::cout << "radixlab-cli " RADIXLAB_VERSION "\n";
 }
 
 std::string jsonEscape(std::string_view text) {
@@ -241,11 +246,19 @@ void emitError(bool json, std::string_view code, std::string_view message) {
 }
 
 int run(int argc, char* argv[]) {
+    bool jsonRequested = false;
+    for (int index = 1; index < argc; ++index) {
+        if (std::string_view(argv[index]) == "--json") {
+            jsonRequested = true;
+            break;
+        }
+    }
+
     Options options;
     try {
         options = parseArguments(argc, argv);
     } catch (const OptionError& error) {
-        emitError(false, "invalid_request", error.what());
+        emitError(jsonRequested, "invalid_request", error.what());
         return 2;
     }
 

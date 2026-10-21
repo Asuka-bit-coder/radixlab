@@ -92,7 +92,8 @@ function validateForm() {
     const numeral = numberInput.value.trim();
     const fromBase = Number(fromSelect.value);
     const toBase = Number(toSelect.value);
-    const limit = Number(limitInput.value);
+    const limitText = limitInput.value.trim();
+    const limit = limitText === "" ? 256 : Number(limitText);
 
     if (numeral.length === 0) {
         return { error: "Enter a numeral to convert." };

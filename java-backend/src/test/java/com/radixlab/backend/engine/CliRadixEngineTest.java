@@ -9,8 +9,15 @@ import com.radixlab.backend.exception.ProcessTimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.radixlab.backend.exception.EngineBusyException;
+
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +109,32 @@ class CliRadixEngineTest {
     }
 
     @Test
+    void rejectsEmptyEngineOutput() {
+        ProcessExecutor executor = (command, timeout) ->
+                new ProcessOutput(0, "", "");
+        CliRadixEngine engine = new CliRadixEngine(
+                executor, new ObjectMapper(), properties);
+
+        assertThatThrownBy(() -> engine.convert(
+                new ConversionCommand("10", 2, 10, 256)))
+                .isInstanceOf(EngineFailureException.class)
+                .hasMessage("Conversion engine returned an invalid response");
+    }
+
+    @Test
+    void usesSafeFallbackForEmptyCliError() {
+        ProcessExecutor executor = (command, timeout) ->
+                new ProcessOutput(2, "", "");
+        CliRadixEngine engine = new CliRadixEngine(
+                executor, new ObjectMapper(), properties);
+
+        assertThatThrownBy(() -> engine.convert(
+                new ConversionCommand("10", 2, 10, 256)))
+                .isInstanceOf(InvalidNumberException.class)
+                .hasMessage("The numeral is invalid for the selected source base");
+    }
+
+    @Test
     void mapsProcessTimeout() {
         ProcessExecutor executor = (command, timeout) -> {
             throw new ProcessTimeoutException("timed out", null);
@@ -113,5 +146,44 @@ class CliRadixEngineTest {
                 new ConversionCommand("10", 2, 10, 256)))
                 .isInstanceOf(EngineTimeoutException.class)
                 .hasMessage("Conversion engine timed out");
+    }
+
+    @Test
+    void rejectsWorkWhenAllProcessSlotsAreBusy() throws Exception {
+        properties.setMaxConcurrent(1);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ProcessExecutor executor = (command, timeout) -> {
+            entered.countDown();
+            try {
+                if (!release.await(3, TimeUnit.SECONDS)) {
+                    throw new ProcessTimeoutException("test release timeout", null);
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new ProcessTimeoutException("interrupted", exception);
+            }
+            return new ProcessOutput(
+                    0,
+                    "{\"result\":\"10\",\"exact\":true,"
+                            + "\"truncated\":false,\"repeating\":false}",
+                    ""
+            );
+        };
+        CliRadixEngine engine = new CliRadixEngine(
+                executor, new ObjectMapper(), properties);
+
+        try (ExecutorService caller = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<EngineResult> first = caller.submit(() -> engine.convert(
+                    new ConversionCommand("2", 10, 2, 256)));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+
+            assertThatThrownBy(() -> engine.convert(
+                    new ConversionCommand("3", 10, 2, 256)))
+                    .isInstanceOf(EngineBusyException.class);
+
+            release.countDown();
+            assertThat(first.get(2, TimeUnit.SECONDS).result()).isEqualTo("10");
+        }
     }
 }

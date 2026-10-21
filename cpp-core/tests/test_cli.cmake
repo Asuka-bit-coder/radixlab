@@ -100,6 +100,12 @@ function(expect_cli_error name expected_exit expected_stderr_fragment)
 endfunction()
 
 expect_cli(
+    "version comes from the build"
+    0 "radixlab-cli 0.1.0"
+    --version
+)
+
+expect_cli(
     "documented fraction conversion"
     0 "2D.6"
     --input 101101.011 --from 2 --to 16
@@ -163,6 +169,12 @@ expect_cli_error(
     "JSON error is machine-readable"
     2 "\"error\":{"
     --input 2 --from 2 --to 10 --json
+)
+
+expect_cli_error(
+    "JSON usage error is machine-readable"
+    2 "\"error\":{"
+    --json --input 10 --from 2
 )
 
 string(REPEAT "1" 4097 oversized_input)

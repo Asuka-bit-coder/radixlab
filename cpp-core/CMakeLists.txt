@@ -11,9 +11,30 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Use Boost's package configuration directly. This is compatible with CMake 4,
-# where the legacy FindBoost module was removed.
-find_package(Boost 1.70 REQUIRED CONFIG)
+# Prefer Boost's package configuration. CMake 4 removed the legacy FindBoost
+# module, so fall back to locating the header-only include tree directly.
+find_package(Boost 1.70 QUIET CONFIG)
+
+if(NOT Boost_FOUND)
+    find_path(
+        Boost_INCLUDE_DIR
+        NAMES boost/multiprecision/cpp_int.hpp
+        DOC "Boost include directory"
+    )
+
+    if(NOT Boost_INCLUDE_DIR)
+        message(FATAL_ERROR
+            "Boost.Multiprecision headers were not found. "
+            "Install Boost 1.70 or newer."
+        )
+    endif()
+
+    add_library(Boost::boost INTERFACE IMPORTED)
+    target_include_directories(Boost::boost
+        INTERFACE "${Boost_INCLUDE_DIR}"
+    )
+    message(STATUS "Using header-only Boost from ${Boost_INCLUDE_DIR}")
+endif()
 
 # ----------------------------------------
 # Core library
@@ -44,6 +65,10 @@ add_executable(radixlab-cli
 
 target_link_libraries(radixlab-cli PRIVATE
     radixlab_core
+)
+
+target_compile_definitions(radixlab-cli PRIVATE
+    RADIXLAB_VERSION="${PROJECT_VERSION}"
 )
 
 # ----------------------------------------
