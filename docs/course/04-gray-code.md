@@ -163,7 +163,7 @@ GrayResult decodeGray(const BitVector& gray);
 ```text
 12: 00001010
 13: 00001011
-        ^
+           ^
 ```
 
 只有 bit 0 改变。
@@ -183,7 +183,7 @@ curl -sS http://localhost:8080/api/v1/encoding/gray \
 3. 下方 “Adjacent transition” 显示当前值与前一个值的 Gray 码，并高亮变化位。
 4. 点击 “Next →” 连续切换，观察每次只有一个格子高亮。
 5. 把位宽改成 4，输入 15，再点 Next，按钮应禁用，因为 4 位最大值是 15。
-6. 输入负数或超过 15 的值，观察范围错误。
+6. 输入负数时观察输入错误；输入超过 15 的值时观察范围错误。
 
 ## 7. 常见误区
 
