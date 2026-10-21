@@ -22,10 +22,6 @@ public:
         std::string_view input,
         int radix
     );
-
-private:
-    [[nodiscard]]
-    static int digitValue(char c);
 };
 
 } // namespace radixlab

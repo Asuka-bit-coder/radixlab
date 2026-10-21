@@ -1,35 +1,12 @@
 #include "radixlab/parser.hpp"
 
+#include "radixlab/digits.hpp"
+
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 
 namespace radixlab {
-
-// Convert an ASCII digit character into its numeric value.
-//
-// '0' - '9' -> 0 - 9
-// 'A' - 'Z' -> 10 - 35
-// 'a' - 'z' -> 10 - 35
-int RadixParser::digitValue(char c) {
-
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    }
-
-    if (c >= 'A' && c <= 'Z') {
-        return c - 'A' + 10;
-    }
-
-    if (c >= 'a' && c <= 'z') {
-        return c - 'a' + 10;
-    }
-
-    throw std::invalid_argument(
-        "Invalid digit character"
-    );
-}
-
 
 // Parse a numeral using Horner's method.
 //
@@ -43,7 +20,7 @@ std::int64_t RadixParser::parse(
     // Step 1: Validate radix
     // --------------------------------------------------
 
-    if (radix < 2 || radix > 36) {
+    if (!detail::isValidRadix(radix)) {
         throw std::invalid_argument(
             "Radix must be between 2 and 36"
         );
@@ -112,7 +89,7 @@ std::int64_t RadixParser::parse(
 
     for (std::size_t i = pos; i < input.size(); ++i) {
 
-        const int digit = digitValue(input[i]);
+        const int digit = detail::digitValue(input[i]);
 
         // A digit must be smaller than the radix.
         if (digit >= radix) {
