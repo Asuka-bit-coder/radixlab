@@ -101,7 +101,7 @@ endfunction()
 
 expect_cli(
     "version comes from the build"
-    0 "radixlab-cli 0.2.0"
+    0 "radixlab-cli 0.3.0"
     --version
 )
 

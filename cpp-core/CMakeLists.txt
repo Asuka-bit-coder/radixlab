@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     radixlab
-    VERSION 0.2.0
-    DESCRIPTION "Exact radix conversion and digital logic encoding engine"
+    VERSION 0.3.0
+    DESCRIPTION "Exact radix conversion, encoding, and Boolean algebra engine"
     LANGUAGES CXX
 )
 
