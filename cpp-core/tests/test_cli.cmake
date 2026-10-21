@@ -184,4 +184,56 @@ expect_cli_error(
     --input "${oversized_input}" --from 2 --to 10
 )
 
+expect_stdout_contains(
+    "signed encoding JSON"
+    0 "\"bits\":\"11110011\""
+    encoding --operation signed-encode --value -13 --width 8
+    --encoding TWOS_COMPLEMENT --json
+)
+
+expect_stdout_contains(
+    "signed negative-zero decode"
+    0 "\"negativeZero\":true"
+    encoding --operation signed-decode --bits 10000000
+    --encoding SIGN_MAGNITUDE --json
+)
+
+expect_cli_error(
+    "signed range error exit code"
+    4 "outside the representable range"
+    encoding --operation signed-encode --value -128 --width 8
+    --encoding SIGN_MAGNITUDE --json
+)
+
+expect_stdout_contains(
+    "BCD groups"
+    0 "\"groups\":[\"0101\",\"1001\"]"
+    encoding --operation bcd-encode --decimal 59 --json
+)
+
+expect_cli_error(
+    "illegal BCD nibble"
+    2 "Illegal BCD nibble"
+    encoding --operation bcd-decode --bits 1010 --json
+)
+
+expect_stdout_contains(
+    "Gray encoding"
+    0 "\"gray\":\"00001011\""
+    encoding --operation gray-encode --value 13 --width 8 --json
+)
+
+expect_stdout_contains(
+    "parity single-bit flip detected"
+    0 "\"valid\":false"
+    encoding --operation parity --bits 1011001 --parity EVEN
+    --flip-bit 3 --json
+)
+
+expect_stdout_contains(
+    "encoding help"
+    0 "Digital logic encodings"
+    encoding --help
+)
+
 message(STATUS "CLI checks passed: ${passed}")

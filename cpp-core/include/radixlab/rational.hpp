@@ -1,12 +1,10 @@
 #pragma once
 
-#include <boost/multiprecision/cpp_int.hpp>
+#include "radixlab/big_int.hpp"
 
 #include <string>
 
 namespace radixlab {
-
-using BigInt = boost::multiprecision::cpp_int;
 
 class Rational {
 public:

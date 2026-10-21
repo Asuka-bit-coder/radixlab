@@ -45,6 +45,11 @@ add_library(radixlab_core STATIC
     src/rational.cpp
     src/rational_parser.cpp
     src/radix_converter.cpp
+    src/encoding/bit_vector.cpp
+    src/encoding/signed_encoding.cpp
+    src/encoding/bcd.cpp
+    src/encoding/gray_code.cpp
+    src/encoding/parity.cpp
 )
 
 target_include_directories(radixlab_core PUBLIC
@@ -61,6 +66,8 @@ target_link_libraries(radixlab_core PUBLIC
 
 add_executable(radixlab-cli
     cli/main.cpp
+    cli/cli_io.cpp
+    cli/encoding_commands.cpp
 )
 
 target_link_libraries(radixlab-cli PRIVATE
@@ -112,10 +119,35 @@ if(BUILD_TESTING)
     target_link_libraries(test_radix_converter PRIVATE radixlab_core)
     radixlab_enable_warnings(test_radix_converter)
 
+    add_executable(test_bit_vector tests/test_bit_vector.cpp)
+    target_link_libraries(test_bit_vector PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_bit_vector)
+
+    add_executable(test_signed_encoding tests/test_signed_encoding.cpp)
+    target_link_libraries(test_signed_encoding PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_signed_encoding)
+
+    add_executable(test_bcd tests/test_bcd.cpp)
+    target_link_libraries(test_bcd PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_bcd)
+
+    add_executable(test_gray_code tests/test_gray_code.cpp)
+    target_link_libraries(test_gray_code PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_gray_code)
+
+    add_executable(test_parity tests/test_parity.cpp)
+    target_link_libraries(test_parity PRIVATE radixlab_core)
+    radixlab_enable_warnings(test_parity)
+
     add_test(NAME RadixParserTests COMMAND test_parser)
     add_test(NAME RationalTests COMMAND test_rational)
     add_test(NAME RationalParserTests COMMAND test_rational_parser)
     add_test(NAME RadixConverterTests COMMAND test_radix_converter)
+    add_test(NAME BitVectorTests COMMAND test_bit_vector)
+    add_test(NAME SignedEncodingTests COMMAND test_signed_encoding)
+    add_test(NAME BcdTests COMMAND test_bcd)
+    add_test(NAME GrayCodeTests COMMAND test_gray_code)
+    add_test(NAME ParityTests COMMAND test_parity)
 
     add_test(
         NAME CliTests
