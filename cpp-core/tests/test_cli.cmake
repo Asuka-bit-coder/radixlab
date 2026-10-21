@@ -101,7 +101,7 @@ endfunction()
 
 expect_cli(
     "version comes from the build"
-    0 "radixlab-cli 0.1.0"
+    0 "radixlab-cli 0.2.0"
     --version
 )
 
@@ -221,6 +221,18 @@ expect_stdout_contains(
     "Gray encoding"
     0 "\"gray\":\"00001011\""
     encoding --operation gray-encode --value 13 --width 8 --json
+)
+
+expect_stdout_contains(
+    "BCD decoding"
+    0 "\"digits\":\"59\""
+    encoding --operation bcd-decode --bits 01011001 --json
+)
+
+expect_stdout_contains(
+    "Gray decoding"
+    0 "\"value\":\"13\""
+    encoding --operation gray-decode --bits 00001011 --json
 )
 
 expect_stdout_contains(

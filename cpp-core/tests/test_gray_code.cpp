@@ -72,6 +72,17 @@ int main() {
         radixlab::encoding::grayToBinary(direct).toBinary() == "1101"
     );
 
+    for (const std::size_t width : {16U, 32U}) {
+        const BigInt value =
+            (BigInt{1} << static_cast<unsigned>(width - 2U)) + 123;
+        const auto encoded = encodeGray(value, width);
+        suite.check(
+            "Gray round trip width " + std::to_string(width),
+            decodeGray(encoded.gray).value == value
+                && encoded.gray.toBinary().size() == width
+        );
+    }
+
     const BigInt maximum64 = (BigInt{1} << 64U) - 1;
     const auto gray64 = encodeGray(maximum64, 64);
     suite.check(

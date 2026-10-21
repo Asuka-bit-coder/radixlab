@@ -36,9 +36,10 @@ ParityResult generateParity(const BitVector& data, ParityMode mode);
 /**
  * Verify a received data word against a received parity bit.
  *
- * A false result means an odd number of data bits changed relative to a
- * single-bit parity scheme (assuming a single parity bit). It does not locate
- * or correct the error, and an even number of bit flips can go undetected.
+ * A false result means the received parity bit differs from the parity
+ * recomputed from the received data, which detects an odd number of changed
+ * bits across the data-plus-parity word. It does not locate or correct the
+ * error, and an even number of changes can go undetected.
  */
 [[nodiscard]]
 bool verifyParity(
