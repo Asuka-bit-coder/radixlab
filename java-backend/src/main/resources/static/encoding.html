@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="RadixLab Encoding Lab: explore sign-magnitude, ones' and two's complement, BCD, reflected Gray code, and parity.">
+    <title>Encoding Lab — RadixLab</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="encoding.css">
+</head>
+<body>
+    <a class="skip-link" href="#encoding-workspace">Skip to the lab</a>
+
+    <header class="site-header">
+        <a class="brand" href="index.html" aria-label="RadixLab home">
+            <span class="brand-mark" aria-hidden="true">R</span>
+            <span>RadixLab</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="index.html">Converter</a>
+            <a href="encoding.html" aria-current="page">Encoding Lab</a>
+        </nav>
+    </header>
+
+    <main class="page encoding-page">
+        <section class="encoding-intro" aria-labelledby="encoding-title">
+            <p class="eyebrow">Digital Logic · Encoding Lab</p>
+            <h1 id="encoding-title">Bit patterns are not values.</h1>
+            <p class="lede">
+                The same eight bits can mean an integer, a signed number, a pair
+                of BCD digits, a Gray-code position, or a parity-protected word.
+                Choose an interpretation and observe the representation directly.
+            </p>
+            <div class="encoding-principle">
+                <span>Interpretation</span>
+                <span aria-hidden="true">=</span>
+                <span>Encoding form</span>
+                <span aria-hidden="true">+</span>
+                <span>Fixed width</span>
+            </div>
+        </section>
+
+        <section id="encoding-workspace" class="lab-shell" aria-label="Encoding experiments">
+            <div class="lab-tabs" role="tablist" aria-label="Encoding topics">
+                <button id="tab-signed" class="lab-tab" type="button" role="tab"
+                        aria-selected="true" aria-controls="panel-signed"
+                        tabindex="0" data-panel="panel-signed">
+                    <span class="tab-number">01</span> Signed
+                </button>
+                <button id="tab-bcd" class="lab-tab" type="button" role="tab"
+                        aria-selected="false" aria-controls="panel-bcd"
+                        tabindex="-1" data-panel="panel-bcd">
+                    <span class="tab-number">02</span> BCD
+                </button>
+                <button id="tab-gray" class="lab-tab" type="button" role="tab"
+                        aria-selected="false" aria-controls="panel-gray"
+                        tabindex="-1" data-panel="panel-gray">
+                    <span class="tab-number">03</span> Gray
+                </button>
+                <button id="tab-parity" class="lab-tab" type="button" role="tab"
+                        aria-selected="false" aria-controls="panel-parity"
+                        tabindex="-1" data-panel="panel-parity">
+                    <span class="tab-number">04</span> Parity
+                </button>
+            </div>
+
+            <section id="panel-signed" class="lab-panel" role="tabpanel"
+                     aria-labelledby="tab-signed" tabindex="0">
+                <div class="lab-grid">
+                    <div class="lab-controls">
+                        <p class="eyebrow">Signed number explorer</p>
+                        <h2>Three interpretations of one width</h2>
+                        <p class="lab-description">
+                            Encode an integer or decode a pattern. Bit index 0 is
+                            the least-significant bit; the leftmost displayed bit
+                            is the sign bit.
+                        </p>
+
+                        <form id="signed-form" class="lab-form" novalidate>
+                            <fieldset class="mode-switch">
+                                <legend>Direction</legend>
+                                <label>
+                                    <input type="radio" name="signed-direction"
+                                           value="encode" checked>
+                                    <span>Value → bits</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="signed-direction"
+                                           value="decode">
+                                    <span>Bits → value</span>
+                                </label>
+                            </fieldset>
+
+                            <div id="signed-encode-fields">
+                                <div class="field">
+                                    <label for="signed-value">Decimal value</label>
+                                    <input id="signed-value" name="value" type="text"
+                                           value="-13" inputmode="numeric"
+                                           autocomplete="off" spellcheck="false">
+                                </div>
+
+                                <div class="base-row">
+                                    <div class="field">
+                                        <label for="signed-width">Bit width</label>
+                                        <select id="signed-width">
+                                            <option value="4">4 bits</option>
+                                            <option value="8" selected>8 bits</option>
+                                            <option value="16">16 bits</option>
+                                            <option value="32">32 bits</option>
+                                            <option value="64">64 bits</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="signed-encoding">Encoding</label>
+                                        <select id="signed-encoding">
+                                            <option value="SIGN_MAGNITUDE">Sign-magnitude</option>
+                                            <option value="ONES_COMPLEMENT">Ones' complement</option>
+                                            <option value="TWOS_COMPLEMENT" selected>Two's complement</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <label id="signed-negative-zero-row" class="check-row">
+                                    <input id="signed-negative-zero" type="checkbox">
+                                    <span>
+                                        Encode negative zero
+                                        <small>Requires value 0; sign-magnitude and ones' complement only</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div id="signed-decode-fields" hidden>
+                                <div class="field">
+                                    <label for="signed-bits">Bit pattern</label>
+                                    <input id="signed-bits" name="bits" type="text"
+                                           value="11110011" inputmode="text"
+                                           autocomplete="off" spellcheck="false"
+                                           class="bit-input">
+                                    <p class="field-help">MSB first · 1–64 binary digits.</p>
+                                </div>
+
+                                <div class="field">
+                                    <label for="signed-decode-encoding">Interpret as</label>
+                                    <select id="signed-decode-encoding">
+                                        <option value="SIGN_MAGNITUDE">Sign-magnitude</option>
+                                        <option value="ONES_COMPLEMENT">Ones' complement</option>
+                                        <option value="TWOS_COMPLEMENT" selected>Two's complement</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="signed-error" class="lab-error" role="alert" hidden></div>
+
+                            <button class="primary-button lab-submit" type="submit">
+                                <span class="button-label">Run encoding</span>
+                                <span class="button-arrow" aria-hidden="true">→</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="lab-display" aria-live="polite" aria-atomic="true">
+                        <div class="lab-display-heading">
+                            <span class="result-kicker">Signed pattern</span>
+                            <span id="signed-status" class="lab-status">Ready</span>
+                        </div>
+
+                        <div class="bit-caption">
+                            <span id="signed-width-label">8-bit word</span>
+                            <span>MSB → LSB</span>
+                        </div>
+                        <div id="signed-bit-grid" class="bit-grid" role="img"
+                             aria-label="Signed bit pattern"></div>
+
+                        <dl class="value-list">
+                            <div>
+                                <dt>Value</dt>
+                                <dd><code id="signed-value-output">—</code></dd>
+                            </div>
+                            <div>
+                                <dt>Hexadecimal</dt>
+                                <dd><code id="signed-hex-output">—</code></dd>
+                            </div>
+                            <div>
+                                <dt>Range</dt>
+                                <dd><code id="signed-range-output">—</code></dd>
+                            </div>
+                        </dl>
+
+                        <p id="signed-note" class="representation-note" hidden></p>
+
+                        <div class="concept-note">
+                            <strong>Negative zero</strong>
+                            <p>
+                                Sign-magnitude and ones' complement each have two
+                                patterns for zero. Two's complement has one zero,
+                                which is why its range extends one value lower.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="panel-bcd" class="lab-panel" role="tabpanel"
+                     aria-labelledby="tab-bcd" tabindex="0" hidden>
+                <div class="lab-grid">
+                    <div class="lab-controls">
+                        <p class="eyebrow">8421 binary-coded decimal</p>
+                        <h2>One decimal digit per nibble</h2>
+                        <p class="lab-description">
+                            BCD is not ordinary binary. Each decimal digit is
+                            stored independently in four bits, so only nibbles
+                            0000–1001 are legal.
+                        </p>
+
+                        <form id="bcd-form" class="lab-form" novalidate>
+                            <div class="field">
+                                <label for="bcd-decimal">Unsigned decimal digits</label>
+                                <input id="bcd-decimal" type="text" value="59"
+                                       inputmode="numeric" autocomplete="off"
+                                       spellcheck="false">
+                                <p class="field-help">
+                                    Leading zeros are preserved: <code>0059</code>
+                                    uses four BCD groups (16 bits).
+                                </p>
+                            </div>
+
+                            <div id="bcd-error" class="lab-error" role="alert" hidden></div>
+
+                            <button class="primary-button lab-submit" type="submit">
+                                <span class="button-label">Encode BCD</span>
+                                <span class="button-arrow" aria-hidden="true">→</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="lab-display" aria-live="polite" aria-atomic="true">
+                        <div class="lab-display-heading">
+                            <span class="result-kicker">BCD groups</span>
+                            <span id="bcd-status" class="lab-status">Ready</span>
+                        </div>
+
+                        <div id="bcd-groups" class="bcd-strip" aria-label="BCD digit groups"></div>
+
+                        <dl class="value-list">
+                            <div>
+                                <dt>Packed BCD</dt>
+                                <dd><code id="bcd-bits-output">—</code></dd>
+                            </div>
+                            <div>
+                                <dt>Ordinary binary</dt>
+                                <dd><code id="bcd-binary-output">—</code></dd>
+                            </div>
+                            <div>
+                                <dt>Decimal value</dt>
+                                <dd><code id="bcd-value-output">—</code></dd>
+                            </div>
+                        </dl>
+
+                        <div class="concept-note">
+                            <strong>Why the lengths differ</strong>
+                            <p>
+                                Decimal 59 becomes <code>0101 1001</code> in BCD
+                                (8 bits) but <code>111011</code> in binary
+                                (6 bits). BCD trades compactness for easy digit
+                                display and decimal arithmetic.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="panel-gray" class="lab-panel" role="tabpanel"
+                     aria-labelledby="tab-gray" tabindex="0" hidden>
+                <div class="lab-grid">
+                    <div class="lab-controls">
+                        <p class="eyebrow">Reflected Gray code</p>
+                        <h2>One bit changes between neighbors</h2>
+                        <p class="lab-description">
+                            Gray code is an unsigned ordering of fixed-width
+                            patterns. Consecutive codes differ in exactly one bit,
+                            which helps avoid transient multi-bit changes.
+                        </p>
+
+                        <form id="gray-form" class="lab-form" novalidate>
+                            <div class="field">
+                                <label for="gray-value">Unsigned value</label>
+                                <input id="gray-value" type="text" value="13"
+                                       inputmode="numeric" autocomplete="off"
+                                       spellcheck="false">
+                            </div>
+
+                            <div class="field">
+                                <label for="gray-width">Bit width</label>
+                                <select id="gray-width">
+                                    <option value="4">4 bits</option>
+                                    <option value="8" selected>8 bits</option>
+                                    <option value="16">16 bits</option>
+                                    <option value="32">32 bits</option>
+                                    <option value="64">64 bits</option>
+                                </select>
+                            </div>
+
+                            <div class="step-row" role="group" aria-label="Adjacent Gray values">
+                                <button id="gray-prev" class="step-button" type="button">← Previous</button>
+                                <button id="gray-next" class="step-button" type="button">Next →</button>
+                            </div>
+
+                            <div id="gray-error" class="lab-error" role="alert" hidden></div>
+
+                            <button class="primary-button lab-submit" type="submit">
+                                <span class="button-label">Show Gray code</span>
+                                <span class="button-arrow" aria-hidden="true">→</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="lab-display" aria-live="polite" aria-atomic="true">
+                        <div class="lab-display-heading">
+                            <span class="result-kicker">Binary ↔ Gray</span>
+                            <span id="gray-status" class="lab-status">Ready</span>
+                        </div>
+
+                        <div class="bit-caption">
+                            <span>Binary for value <code id="gray-value-output">—</code></span>
+                            <span>MSB → LSB</span>
+                        </div>
+                        <div id="gray-binary-grid" class="bit-grid" role="img"
+                             aria-label="Binary bit pattern"></div>
+
+                        <div class="bit-caption bit-caption-spaced">
+                            <span>Reflected Gray code</span>
+                            <span>G = B ⊕ (B ≫ 1)</span>
+                        </div>
+                        <div id="gray-gray-grid" class="bit-grid" role="img"
+                             aria-label="Gray code bit pattern"></div>
+
+                        <div id="gray-transition" class="transition-card" hidden>
+                            <div class="transition-heading">
+                                <strong>Adjacent transition</strong>
+                                <span id="gray-changed"></span>
+                            </div>
+                            <p>
+                                <code id="gray-prev-value">—</code>
+                                <span aria-hidden="true">→</span>
+                                <code id="gray-current-value">—</code>
+                            </p>
+                            <div id="gray-transition-grid" class="bit-grid bit-grid-compact"
+                                 role="img" aria-label="Changed bits between adjacent Gray codes"></div>
+                        </div>
+
+                        <div class="concept-note">
+                            <strong>Not a numeric base</strong>
+                            <p>
+                                Gray code represents positions, not ordinary
+                                place-value digits. It is decoded back to binary
+                                before arithmetic.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="panel-parity" class="lab-panel" role="tabpanel"
+                     aria-labelledby="tab-parity" tabindex="0" hidden>
+                <div class="lab-grid">
+                    <div class="lab-controls">
+                        <p class="eyebrow">Single-bit parity</p>
+                        <h2>Detect a change, not its location</h2>
+                        <p class="lab-description">
+                            Generate an even or odd parity bit, then flip one data
+                            bit to see the receiver's check fail. Parity never
+                            corrects the error.
+                        </p>
+
+                        <form id="parity-form" class="lab-form" novalidate>
+                            <div class="field">
+                                <label for="parity-bits">Data bits</label>
+                                <input id="parity-bits" type="text" value="1011001"
+                                       inputmode="text" autocomplete="off"
+                                       spellcheck="false" class="bit-input">
+                                <p class="field-help">MSB first · 1–64 binary digits.</p>
+                            </div>
+
+                            <div class="base-row">
+                                <div class="field">
+                                    <label for="parity-mode">Parity mode</label>
+                                    <select id="parity-mode">
+                                        <option value="EVEN" selected>Even parity</option>
+                                        <option value="ODD">Odd parity</option>
+                                    </select>
+                                </div>
+
+                                <div class="field">
+                                    <label for="parity-flip">Flip a data bit</label>
+                                    <select id="parity-flip">
+                                        <option value="">No flip</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="parity-error" class="lab-error" role="alert" hidden></div>
+
+                            <button class="primary-button lab-submit" type="submit">
+                                <span class="button-label">Run parity check</span>
+                                <span class="button-arrow" aria-hidden="true">→</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="lab-display" aria-live="polite" aria-atomic="true">
+                        <div class="lab-display-heading">
+                            <span class="result-kicker">Parity word</span>
+                            <span id="parity-status" class="lab-status">Ready</span>
+                        </div>
+
+                        <div class="bit-caption">
+                            <span>Received data + transmitted parity bit</span>
+                            <span>MSB → LSB</span>
+                        </div>
+                        <div id="parity-word" class="parity-word" role="img"
+                             aria-label="Received parity word"></div>
+
+                        <dl class="value-list">
+                            <div>
+                                <dt>Data ones</dt>
+                                <dd><code id="parity-ones-output">—</code></dd>
+                            </div>
+                            <div>
+                                <dt>Generated parity bit</dt>
+                                <dd><code id="parity-expected-output">—</code></dd>
+                            </div>
+                            <div>
+                                <dt>Receiver recomputes</dt>
+                                <dd><code id="parity-computed-output">—</code></dd>
+                            </div>
+                        </dl>
+
+                        <p id="parity-message" class="representation-note"></p>
+
+                        <div class="concept-note">
+                            <strong>Limit of the check</strong>
+                            <p>
+                                Single-bit parity detects an odd number of flips.
+                                Any even number of flips leaves parity unchanged,
+                                and a detected error cannot be located without more
+                                redundant bits.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <section class="lab-footer-note">
+            <p>
+                All computations run in the C++20 engine through the RadixLab
+                REST API. Bit index 0 is the least-significant bit.
+            </p>
+            <a href="index.html">Back to exact radix conversion →</a>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>RadixLab v0.2.0 · Digital Logic Encoding Lab</p>
+        <code>/api/v1/encoding/*</code>
+    </footer>
+
+    <script src="encoding.js" defer></script>
+</body>
+</html>

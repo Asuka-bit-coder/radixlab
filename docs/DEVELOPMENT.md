@@ -5,7 +5,7 @@
 | Tool | Version used | Notes |
 | --- | --- | --- |
 | C++ compiler | Apple Clang 21 / GCC 13+ | C++20 required |
-| CMake | 4.4.4 locally; 3.20 minimum | Boost is found through `BoostConfig.cmake` |
+| CMake | 4.4.4 locally; 3.20 minimum | Prefers `BoostConfig.cmake`; header-only fallback supports CMake 4 |
 | Boost | 1.92 locally; 1.70 minimum | Headers and CMake config required |
 | Java | Temurin 21.0.12 | `java.version` is 21 |
 | Maven | 3.10 locally; 3.9+ recommended | Spring Boot 3.5.16 parent |
@@ -42,6 +42,22 @@ Build output is ignored. Do not commit:
 The C++ library has no generated source. The Java jar is reproducible from the
 Maven project and is not committed.
 
+### Attribution policy
+
+Project authorship belongs to the repository owner and real Git contributors.
+The project-level `.claude/settings.json` disables AI commit/PR attribution, and
+`.githooks/commit-msg` rejects unauthorized AI/tool trailers or attribution text.
+Enable the local guard after cloning:
+
+```bash
+chmod +x .githooks/commit-msg
+git config core.hooksPath .githooks
+```
+
+This setting is local to the repository and does not alter global Git identity or
+block legitimate human co-authors. Existing published history is never rewritten
+to enforce the policy.
+
 ## C++ workflow
 
 Configure once and rebuild incrementally:
@@ -68,6 +84,7 @@ Run a subset:
 
 ```bash
 ctest --test-dir cpp-core/build -R RadixConverterTests --output-on-failure
+ctest --test-dir cpp-core/build -R 'BitVectorTests|SignedEncodingTests|BcdTests' --output-on-failure
 ctest --test-dir cpp-core/build -R CliTests --output-on-failure
 ```
 
@@ -78,17 +95,19 @@ the built executable and checks stdout, stderr, exit codes, JSON, and limits.
 
 1. Put reusable digit logic in `include/radixlab/digits.hpp`.
 2. Preserve `Rational` invariants at construction rather than at call sites.
-3. Keep conversion in integer arithmetic; do not introduce floating point.
-4. Extend the executable tests for each success and failure state.
-5. Add a CLI process case if the public process contract changes.
-6. Build with `-Wall -Wextra -Wpedantic -Wconversion` and remove new warnings.
+3. Keep conversion and encoding in integer arithmetic; do not introduce floating point.
+4. Keep `BitVector` as a pattern, not an implicit signed value.
+5. Preserve representable-range checks; never mask an out-of-range input.
+6. Extend the executable tests for each success and failure state.
+7. Add a CLI process case if the public process contract changes.
+8. Build with `-Wall -Wextra -Wpedantic -Wconversion` and remove new warnings.
 
 ## Java workflow
 
 ```bash
 cd java-backend
 mvn test        # unit, controller, adapter, process tests
-mvn package     # builds target/radixlab-backend-0.1.0.jar
+mvn package     # builds target/radixlab-backend-0.2.0.jar
 ```
 
 `mvn test` excludes tests tagged `integration`. Full verification requires the
@@ -110,6 +129,8 @@ mvn -Dtest=CliRadixEngineTest test
 ```
 
 ### Manual backend smoke test
+
+Conversion and encoding share the same CLI path and process timeout.
 
 Terminal 1:
 
@@ -133,7 +154,22 @@ Expected:
 {"result":"0.0(0011)","exact":true,"truncated":false,"repeating":true}
 ```
 
-Open <http://localhost:8080> for the UI.
+Open <http://localhost:8080> for the converter and
+<http://localhost:8080/encoding.html> for the Encoding Lab.
+
+Encoding smoke test:
+
+```bash
+curl -sS http://localhost:8080/api/v1/encoding/signed \
+  -H 'Content-Type: application/json' \
+  -d '{"value":"-13","width":8,"encoding":"TWOS_COMPLEMENT"}'
+```
+
+Expected:
+
+```json
+{"value":"-13","width":8,"encoding":"TWOS_COMPLEMENT","bits":"11110011","hex":"F3","representable":true,"negativeZero":false,"minimum":"-128","maximum":"127"}
+```
 
 ### Configuration
 
@@ -152,20 +188,23 @@ requires the binary to be on `PATH`.
 ### Adding backend behavior
 
 - Validate untrusted request data at the DTO boundary.
-- Keep OS process concerns behind `ProcessExecutor`.
-- Keep conversion semantics behind `RadixEngine`.
-- Map failures to typed exceptions; do not leak engine stderr or paths.
+- Keep OS process concerns behind `ProcessExecutor` and shared limits behind `CliEngineClient`.
+- Keep conversion semantics behind `RadixEngine`; keep encoding semantics behind `EncodingEngine`.
+- Map input failures to 400, representable-range failures to 422, and engine failures to 502/503/504.
+- Do not leak engine stderr or paths.
 - Add a unit/controller test and, when the real CLI contract is involved, an
   integration test.
 - Never concatenate request fields into a shell command.
 
 ## CI gates
 
-`.github/workflows/ci.yml` has three independent jobs:
+`.github/workflows/ci.yml` has four independent jobs:
 
 1. **C++ / Debug and Release** — compile and run CTest on Ubuntu.
 2. **Java unit tests** — Maven unit, controller, adapter, and process tests.
-3. **End-to-end integration** — build the real CLI, then run `mvn verify` so the
+3. **Attribution policy** — scan only the new commit range for unauthorized AI/tool
+   attribution; published history is not rewritten.
+4. **End-to-end integration** — build the real CLI, then run `mvn verify` so the
    HTTP integration suite invokes C++.
 
 The workflow installs Boost with `apt`, sets up Temurin 21, and uses no
@@ -175,13 +214,19 @@ The workflow installs Boost with `apt`, sets up Temurin 21, and uses no
 
 ### `Could not find a package configuration file provided by "Boost"`
 
-Install the Boost development package. RadixLab uses `find_package(Boost CONFIG)`
-to remain compatible with CMake 4, where the legacy `FindBoost` module was
-removed.
+Install the Boost development package. RadixLab prefers `find_package(Boost CONFIG)`
+for CMake 4 compatibility, then falls back to locating the header-only include
+tree directly if no Boost CMake package is installed.
 
 ### `Integration test requires the C++ CLI`
 
 Build `cpp-core` first or set `RADIXLAB_CLI_PATH` to an absolute path.
+
+### `Value ... outside the representable range` with HTTP 422
+
+The request is valid but cannot be encoded at that width. Choose a larger width or
+an encoding with a wider range. Two's complement is one value wider than the
+other forms.
 
 ### `Conversion engine failed` with HTTP 502
 
@@ -204,7 +249,9 @@ For the jar, append `--server.port=8081`.
 
 1. C++ Debug and Release tests pass.
 2. `mvn verify` passes with the real CLI.
-3. CI jobs pass on the pushed commit.
-4. README commands and observed outputs agree.
-5. No secrets or build artifacts are staged.
-6. Version strings agree across CMake, CLI, `pom.xml`, and release tag.
+3. Encoding endpoints and both UI pages pass the integration suite.
+4. CI jobs pass on the pushed commit.
+5. README, API, course notes, and observed outputs agree.
+6. No secrets or build artifacts are staged.
+7. New commits contain no unauthorized AI/tool attribution.
+8. Version strings agree across CMake, CLI, `pom.xml`, and release tag.

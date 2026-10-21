@@ -132,12 +132,71 @@ select {
     font-size: 0.98rem;
 }
 
-.header-note {
+.site-nav {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.site-nav a {
+    padding-block: 6px;
+    border-bottom: 1px solid transparent;
     color: var(--ink-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+
+.site-nav a:hover {
+    color: var(--ink);
+}
+
+.site-nav a[aria-current="page"] {
+    border-bottom-color: var(--accent);
+    color: var(--ink);
+}
+
+.lab-callout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 54px;
+    padding: 24px 28px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-medium);
+    background: var(--surface);
+    color: var(--ink);
+    text-decoration: none;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.lab-callout:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.lab-callout > span:first-child {
+    display: grid;
+    gap: 3px;
+}
+
+.lab-callout strong {
+    font-family: var(--serif);
+    font-size: 1.2rem;
+    font-weight: 500;
+}
+
+.lab-callout > span:first-child > span:last-child {
+    color: var(--ink-muted);
+    font-size: 0.8rem;
+}
+
+.lab-callout-arrow {
+    color: var(--accent);
     font-family: var(--mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.11em;
-    text-transform: uppercase;
+    font-size: 1.2rem;
 }
 
 .page {
@@ -635,8 +694,16 @@ code {
         min-height: 70px;
     }
 
-    .header-note {
-        display: none;
+    .site-nav {
+        gap: 14px;
+    }
+
+    .site-nav a {
+        font-size: 0.72rem;
+    }
+
+    .lab-callout {
+        padding: 20px;
     }
 
     .base-row {

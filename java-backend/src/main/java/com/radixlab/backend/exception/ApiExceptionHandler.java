@@ -102,6 +102,26 @@ public class ApiExceptionHandler {
         return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
     }
 
+    @ExceptionHandler(InvalidEncodingException.class)
+    public ResponseEntity<ApiError> handleInvalidEncoding(
+            InvalidEncodingException exception,
+            HttpServletRequest request
+    ) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(UnrepresentableValueException.class)
+    public ResponseEntity<ApiError> handleUnrepresentableValue(
+            UnrepresentableValueException exception,
+            HttpServletRequest request
+    ) {
+        return response(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                exception.getMessage(),
+                request
+        );
+    }
+
     @ExceptionHandler(EngineTimeoutException.class)
     public ResponseEntity<ApiError> handleTimeout(
             EngineTimeoutException exception,

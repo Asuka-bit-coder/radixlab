@@ -35,6 +35,13 @@ class CliRadixEngineTest {
         properties.setMaxConcurrent(2);
     }
 
+    private CliRadixEngine engine(ProcessExecutor executor) {
+        return new CliRadixEngine(
+                new CliEngineClient(executor, properties),
+                new ObjectMapper()
+        );
+    }
+
     @Test
     void invokesCliWithoutShellAndParsesResult() {
         AtomicReference<List<String>> captured = new AtomicReference<>();
@@ -47,8 +54,7 @@ class CliRadixEngineTest {
                     ""
             );
         };
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         EngineResult result = engine.convert(
                 new ConversionCommand("101101.011", 2, 16, 256));
@@ -73,8 +79,7 @@ class CliRadixEngineTest {
                 "{\"error\":{\"code\":\"invalid_number\","
                         + "\"message\":\"Digit out of range for radix\"}}"
         );
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         assertThatThrownBy(() -> engine.convert(
                 new ConversionCommand("102", 2, 10, 256)))
@@ -86,8 +91,7 @@ class CliRadixEngineTest {
     void mapsAbnormalExitToEngineFailure() {
         ProcessExecutor executor = (command, timeout) ->
                 new ProcessOutput(1, "", "segmentation-style internal failure");
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         assertThatThrownBy(() -> engine.convert(
                 new ConversionCommand("10", 2, 10, 256)))
@@ -99,8 +103,7 @@ class CliRadixEngineTest {
     void rejectsMalformedEngineJson() {
         ProcessExecutor executor = (command, timeout) ->
                 new ProcessOutput(0, "not-json", "");
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         assertThatThrownBy(() -> engine.convert(
                 new ConversionCommand("10", 2, 10, 256)))
@@ -112,8 +115,7 @@ class CliRadixEngineTest {
     void rejectsEmptyEngineOutput() {
         ProcessExecutor executor = (command, timeout) ->
                 new ProcessOutput(0, "", "");
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         assertThatThrownBy(() -> engine.convert(
                 new ConversionCommand("10", 2, 10, 256)))
@@ -125,8 +127,7 @@ class CliRadixEngineTest {
     void usesSafeFallbackForEmptyCliError() {
         ProcessExecutor executor = (command, timeout) ->
                 new ProcessOutput(2, "", "");
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         assertThatThrownBy(() -> engine.convert(
                 new ConversionCommand("10", 2, 10, 256)))
@@ -139,8 +140,7 @@ class CliRadixEngineTest {
         ProcessExecutor executor = (command, timeout) -> {
             throw new ProcessTimeoutException("timed out", null);
         };
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         assertThatThrownBy(() -> engine.convert(
                 new ConversionCommand("10", 2, 10, 256)))
@@ -170,8 +170,7 @@ class CliRadixEngineTest {
                     ""
             );
         };
-        CliRadixEngine engine = new CliRadixEngine(
-                executor, new ObjectMapper(), properties);
+        CliRadixEngine engine = engine(executor);
 
         try (ExecutorService caller = Executors.newVirtualThreadPerTaskExecutor()) {
             Future<EngineResult> first = caller.submit(() -> engine.convert(

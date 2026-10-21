@@ -1,0 +1,18 @@
+#!/bin/sh
+# Repository-local guard against unauthorized AI/tool attribution.
+# Scope: this repository only (installed through core.hooksPath).
+set -eu
+
+message_file=${1:?commit message file is required}
+
+if grep -Eiq '^[[:space:]]*co-authored-by:.*(claude|anthropic|deepseek|openai|gpt|copilot)' "$message_file"; then
+    echo "commit-msg: AI co-author trailers are not permitted in this repository." >&2
+    exit 1
+fi
+
+if grep -Eiq '(claude-session:|generated with claude code|built by claude|co-developed with claude|ai co-founder|claude developer)' "$message_file"; then
+    echo "commit-msg: unauthorized AI/tool attribution text is not permitted." >&2
+    exit 1
+fi
+
+exit 0
